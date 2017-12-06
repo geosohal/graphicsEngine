@@ -61,6 +61,13 @@ bld/
 *.VisualState.xml
 TestResult.xml
 
+<<<<<<< HEAD
+=======
+# Build Results of an ATL Project
+[Dd]ebugPS/
+[Rr]eleasePS/
+
+>>>>>>> 704bdd2b5fb10fd4a6c3a8119923beeb198e050e
 
 # .NET Core
 project.lock.json
@@ -314,3 +321,15 @@ __pycache__/
 # should be stored in the .pubxml.user file.
 
 # End of https://www.gitignore.io/api/windows,visualstudio
+*.idb
+Debug/framework.lib
+Debug/framework.tlog/link.write.1.tlog
+Debug/framework.tlog/link.read.1.tlog
+Debug/framework.tlog/link.command.1.tlog
+Debug/framework.tlog/framework.write.1u.tlog
+Debug/framework.tlog/framework.lastbuildstate
+Debug/framework.tlog/CL.write.1.tlog
+Debug/framework.tlog/CL.read.1.tlog
+Debug/framework.tlog/CL.command.1.tlog
+Debug/framework.exp
+Debug/framework.exe
