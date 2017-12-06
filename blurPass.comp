@@ -1,0 +1,42 @@
+// horizontal blur pass
+
+#version 430 // Version of OpenGL with COMPUTE shader support
+
+layout(local_size_x = 148, local_size_y = 1, local_size_z = 1) in;
+// Declares thread group size
+
+uniform blurKernel {float weights [101]; }; // Declares a uniform block
+
+uniform int kernalSize = 3; // size must always be odd number to have a whole number half width
+
+layout (r32f) uniform readonly image2D src; // src image as single channel 32bit float readonly
+layout (r32f) uniform writeonly image2D dst; // ds
+
+shared float v[148+101]; // Variable shared with other threads in the 148x1 thread group
+
+void main()
+{
+    int w = (kernalSize - 1) / 2;
+
+    //horizontal pass, since the gpos offsets affect x component
+
+    ivec2 gpos = ivec2(gl_GlobalInvocationID.xy); // Combo of groupID, groupSize and localID
+    uint i = gl_LocalInvocationID.x; // Local thread id in the 148x1 thread groups128x1
+
+	v[i] = imageLoad(src, gpos+ivec2(-w,0) ).x;
+
+    if (i<2*w)
+         v[i+148] = imageLoad(src, gpos+ivec2(148-w,0) ).x; // read extra 2*w pixels. 
+    barrier(); // Wait for all threads to catchup before reading v[]
+
+    // for each thread and its corresponding pixel in thread group, multiply weights and pixels
+    float blurredPixel = 0.f;
+    for (int j = 0; j <= 2*w; j++)    // remember, this is loop for single thread
+    {
+        uint vertIndex = (i+j);
+        blurredPixel += weights[j] * v[vertIndex]; // or i+j??
+    }
+
+    imageStore(dst, gpos, vec4(blurredPixel)); // Write to destination image
+	 barrier();
+}

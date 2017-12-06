@@ -1,0 +1,75 @@
+// bilateral blurr filter
+
+#version 430
+
+#define pi   3.1415926535897932384626433832795
+
+const float depth = 0.5f;	// need to replace this with actual depth
+const float variance = .1f;
+const int dimensions = 592;
+
+layout(local_size_x = 148, local_size_y = 1, local_size_z = 1) in;
+// Declares thread group size
+
+uniform blurKernel {float weights [74]; }; // Declares a uniform block
+uniform sampler2D normalMap;
+uniform sampler2D depthMap;
+uniform int kernalSize = 3; // size must always be odd number to have a whole number half width
+
+layout (r32f) uniform readonly image2D src; // src image as single channel 32bit float readonly
+layout (r32f) uniform writeonly image2D dst; // ds
+
+shared float v[148+74]; // Variable shared with other threads in the 148x1 thread group
+shared vec3 n[148+74];
+
+vec2 GetUVCoord(ivec2 texel)
+{
+	return vec2(float(texel.x), float(texel.y))/ vec2(dimensions, dimensions);
+}
+
+float CalcRangeKernal(uint baseTexel, uint currTexel)
+{
+	float N = max(0.f, dot(n[currTexel],n[baseTexel]));
+	// todo need to add actual depth
+	float E = exp(-.12f / variance * 2.f);
+	return N * E / sqrt(2.0 * pi * variance);
+}
+void main()
+{
+    int w = (kernalSize - 1) / 2;
+
+    //horizontal pass, since the gpos offsets affect x component
+
+    ivec2 gpos = ivec2(gl_GlobalInvocationID.xy); // Combo of groupID, groupSize and localID
+    uint i = gl_LocalInvocationID.x; // Local thread id in the 148x1 thread groups128x1
+
+	ivec2 currTexel = gpos+ivec2(-w,0);
+	vec2 uv = GetUVCoord(currTexel);
+	v[i] = imageLoad(src, currTexel ).x;
+	n[i] = texture(normalMap, uv).xyz;
+
+    if (i<2*w)
+	{
+		currTexel = gpos+ivec2(148-w,0);
+		uv = GetUVCoord(currTexel);
+        v[i+148] = imageLoad(src, currTexel ).x; // read extra 2*w pixels. 
+		n[i+148] = texture(normalMap, uv).xyz;
+	}
+    barrier(); // Wait for all threads to catchup before reading v[] and n[]
+
+    // for each thread and its corresponding pixel in thread group, multiply weights and pixels
+    float blurredPixel = 0.f;
+	uint baseIndex = i + w;
+	float wSum = 1;
+    for (int j = 0; j <= 2*w; j++)    // remember, this is loop for single thread
+    {
+        uint vertIndex = (i+j);
+		float spatialKernal = weights[j];
+		float rangeKernal = CalcRangeKernal(baseIndex, vertIndex);
+		float W = spatialKernal;//rangeKernal * spatialKernal;
+        blurredPixel += v[vertIndex] * W*0;
+		//wSum += W;
+    }
+
+    imageStore(dst, gpos, vec4(blurredPixel / wSum)); // Write to destination image
+}
