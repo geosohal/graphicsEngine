@@ -65,7 +65,7 @@ TestResult.xml
 # Build Results of an ATL Project
 [Dd]ebugPS/
 [Rr]eleasePS/
-dlldata.c
+
 
 # .NET Core
 project.lock.json
