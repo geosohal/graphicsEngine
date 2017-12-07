@@ -244,9 +244,8 @@ void main()
 		finalColor = vec4(ToneMap(vec3(finalColor.x,finalColor.y, finalColor.z)),1);
 		finalColor = l2rgb(finalColor);
 	
-		float depth = ((gl_FragDepth-MIN_DEPTH) / (MAX_DEPTH - MIN_DEPTH))*10.f;
+		float depth = ((texture(aoMap, TexCoord).x-MIN_DEPTH) / (MAX_DEPTH - MIN_DEPTH))*10.f;
 		depth = 1f;
-		//float AOfactor = CalcAOFactor(N, pixPos, depth);
 		float AOfactor = texture(aoMap, TexCoord).x;
 		FragColor = finalColor * AOfactor;
 		//FragColor = vec4(texture(positionMap, TexCoord));
