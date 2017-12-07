@@ -4,14 +4,14 @@
 
 #define pi   3.1415926535897932384626433832795
 
-const float depth = 0.5f;	// need to replace this with actual depth
-const float variance = .1f;
+//const float depth = 0.5f;	// need to replace this with actual depth
+const float variance = 8.8f;
 const int dimensions = 592;
 
 layout(local_size_x = 148, local_size_y = 1, local_size_z = 1) in;
 // Declares thread group size
 
-uniform blurKernel {float weights [74]; }; // Declares a uniform block
+uniform blurKernel {float weights [101]; }; // Declares a uniform block
 uniform sampler2D normalMap;
 uniform sampler2D depthMap;
 uniform int kernalSize = 3; // size must always be odd number to have a whole number half width
@@ -21,6 +21,7 @@ layout (r32f) uniform writeonly image2D dst; // ds
 
 shared float v[148+74]; // Variable shared with other threads in the 148x1 thread group
 shared vec3 n[148+74];
+shared float d[148+74];
 
 vec2 GetUVCoord(ivec2 texel)
 {
@@ -29,10 +30,11 @@ vec2 GetUVCoord(ivec2 texel)
 
 float CalcRangeKernal(uint baseTexel, uint currTexel)
 {
+	float D = sqrt(2.f * pi * variance);
 	float N = max(0.f, dot(n[currTexel],n[baseTexel]));
-	// todo need to add actual depth
-	float E = exp(-.12f / variance * 2.f);
-	return N * E / sqrt(2.0 * pi * variance);
+	float delta = (d[currTexel] - d[baseTexel]);
+	float E = exp( -(delta*delta) / (variance * 2.f));
+	return N * E / D;
 }
 void main()
 {
@@ -47,6 +49,7 @@ void main()
 	vec2 uv = GetUVCoord(currTexel);
 	v[i] = imageLoad(src, currTexel ).x;
 	n[i] = texture(normalMap, uv).xyz;
+	d[i] =texture(depthMap, uv).z;
 
     if (i<2*w)
 	{
@@ -66,10 +69,10 @@ void main()
         uint vertIndex = (i+j);
 		float spatialKernal = weights[j];
 		float rangeKernal = CalcRangeKernal(baseIndex, vertIndex);
-		float W = spatialKernal;//rangeKernal * spatialKernal;
-        blurredPixel += v[vertIndex] * W*0;
-		//wSum += W;
+		float W =  spatialKernal*rangeKernal;
+        blurredPixel += v[vertIndex] * W;
+		wSum += W;
     }
 
-    imageStore(dst, gpos, vec4(blurredPixel / wSum)); // Write to destination image
+    imageStore(dst, gpos, vec4(blurredPixel/wSum )); // Write to destination image
 }

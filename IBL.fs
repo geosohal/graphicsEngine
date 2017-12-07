@@ -16,7 +16,7 @@ uniform sampler2D environment;
 uniform sampler2D irradiance;
 uniform sampler2D positionMap;// from gbuffer
 uniform sampler2D normalMap;	// from gbuffer
-uniform sampler2D depthMap;	//from gbuffer
+//uniform sampler2D depthMap;	//from gbuffer dont think we need this here
 uniform sampler2D colorMap;
 uniform sampler2D aoMap;	// this is the specular map, it stores the AO factor in y component
 
@@ -260,7 +260,6 @@ void main()
 	/*
 	vec2 uv = gl_FragCoord.xy / vec2(592,592);
 	float col = texture(aoMap, TexCoord).x;
-	float col2 = ((col-MIN_DEPTH) / (MAX_DEPTH - MIN_DEPTH))*300000.f;
-	FragColor = vec4(col2,col,gl_FragDepth*5000.f,1);	*/
+	FragColor = vec4(col,col,col,1);	*/
 }
 

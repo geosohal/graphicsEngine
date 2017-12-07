@@ -117,9 +117,9 @@ void Scene::InitializeScene()
 	mode = 9;
 	key = 0;
 	nav = true;
-	spin = 209.63;
-	tilt = 2.59;
-	eye = vec3(0.7065f, 1.64f, 3.7f);
+	spin = 210.63;
+	tilt = 6.259;
+	eye = vec3(1.56f, 2.8f, 3.7f);
 	speed = .005f;
 	last_time = glutGet((GLenum)GLUT_ELAPSED_TIME);
 	tr = vec3(0.0, 0.0, 25.0);
@@ -208,8 +208,8 @@ void Scene::InitializeScene()
 #endif
 #endif
 
-			kernalSize = 71;
-		InitializePascalsTri(80);
+		kernalSize = 47;
+		InitializePascalsTri(91);
 		vector<float> weights;
 		weights.reserve(kernalSize);
 		float weightSum = 0;
@@ -223,7 +223,7 @@ void Scene::InitializeScene()
 		}
 		for (int i = 0; i < weights.size(); i++)
 		{
-			weights[i] = weights[i]*100.f / weightSum;
+			weights[i] = weights[i] ;
 		}
 
 
@@ -256,7 +256,7 @@ void Scene::InitializeScene()
 		bilateralBlurV->LinkProgram();
 		bilateralBlurV->Use();
 		programId = bilateralBlurV->programId;
-		blockID = 0;
+		//blockID = 0;
 		glGenBuffers(1, &blockID); // Generates block for weights array
 		bindpoint++; // Start at zero, increment for other blocks
 		loc = glGetUniformBlockIndex(programId, "blurKernel");
@@ -381,7 +381,7 @@ void Scene::InitializeScene()
 #ifndef PROJECT1
 	testMesh = new BasicMesh();
 	CHECKERRORNOX
-		if (!testMesh->LoadMesh("content/buddha.obj")) {
+		if (!testMesh->LoadMesh("content/dragon.obj")) {
 			printf("Problem loading mesh");
 		}
 	box = new BasicMesh();
@@ -673,7 +673,7 @@ void Scene::DrawScene()
 #endif
 #ifdef DEFERREDSHADING
 		// from DS geometry pass
-		gbuffer.DrawBind();
+		gbuffer.DrawBind();		// all depth and color writes now go to gbuffer's textures
 	#ifndef BUFFERDEBUG
 		//prevent anything but this pass from writing into the depth buffer
 		// as the light pass doesnt have anythign to write into it
@@ -711,6 +711,7 @@ void Scene::DrawScene()
 #ifndef PROJECT1
 // Use the lighting shader
 	lightingProgram->Use();
+	lightingProgram->SetUniformi("depthMap", gbuffer.depthTexture);
 	programId = lightingProgram->programId;
 	int loc;
 	loc = glGetUniformLocation(programId, "gWVP"); // todog actually gVP
@@ -809,61 +810,42 @@ void Scene::DrawScene()
 		aoFbo.BindForWrite();	// from now on all color writes will goto aoFBO.aoTexture?
 		glClear(GL_COLOR_BUFFER_BIT);	// if we dont clear texture keeps accumulating the writes
 		aoProgram->Use();
-		programId = aoProgram->programId;
-		loc = glGetUniformLocation(programId, "positionMap");
-		glUniform1i(loc, GBuffer::GBUFFER_TYPE_POS);
-		loc = glGetUniformLocation(programId, "normalMap");
-		glUniform1i(loc, GBuffer::GBUFFER_TYPE_NORMAL);
-		loc = glGetUniformLocation(programId, "gWorld");
+		aoProgram->SetUniformi("positionMap", GBuffer::GBUFFER_TYPE_POS);
+		aoProgram->SetUniformi("normalMap", GBuffer::GBUFFER_TYPE_NORMAL);
+		//loc = glGetUniformLocation(programId, "gWorld");
 		//aoProgram->SetUniformi("depthMap", gbuffer.depthTexture);
-		loc = glGetUniformLocation(programId, "depthMap");
-		glUniform1i(loc, gbuffer.depthTexture);
+		aoProgram->SetUniformi("depthMap", GBuffer::GBUFFER_TYPE_SPEC);	// specular is not spec, but it has 
+														//depth in .z component of the vec3
 		quad->Render();
-		aoFbo.UnbindWrite();
-
+		aoFbo.UnbindWrite();	// switch back to default framebuffer
+		/*
 		//////////////////////
-		// bi lateral blur pass
+		// bi lateral blur pass, aoTexture -> aoTextureF
 		bilateralBlur->Use();
-		programId = bilateralBlur->programId;
-		// set all uniform and image variables		//int imageUnit = 0; // Increment for other images
-		int aoTextureID = aoFbo.aoTexture;
-		loc = glGetUniformLocation(programId, "kernalSize");
-		glUniform1i(loc, kernalSize);
-		loc = glGetUniformLocation(programId, "normalMap");
-		glUniform1i(loc, GBuffer::GBUFFER_TYPE_NORMAL);
-		loc = glGetUniformLocation(programId, "src");
-		glBindImageTexture(0, aoTextureID, 0, GL_FALSE, 0, GL_READ_ONLY, GL_R32F);
-		glUniform1i(loc, 0);
-		//imageUnit++;
-		loc = glGetUniformLocation(programId, "dst");
-		int blurredTexture = aoFbo.aoTextureF;
-		glBindImageTexture(1, blurredTexture, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_R32F);
-		glUniform1i(loc, 1);
+		bilateralBlur->SetUniformi("kernalSize", kernalSize);
+		bilateralBlur->SetUniformi("normalMap", GBuffer::GBUFFER_TYPE_NORMAL);
+		bilateralBlur->SetUniformi("depthMap", GBuffer::GBUFFER_TYPE_SPEC);
+		glBindImageTexture(0, aoFbo.aoTexture, 0, GL_FALSE, 0, GL_READ_ONLY, GL_R32F);
+		bilateralBlur->SetUniformi("src", 0);
+		glBindImageTexture(1, aoFbo.aoTextureF, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_R32F);
+		bilateralBlur->SetUniformi("dst", 1);
 		glDispatchCompute(width / 148, height, 1); // Tiles WxH image with groups sized 128x1
-	//	glMemoryBarrier(GL_ALL_BARRIER_BITS);
-		////////////////////// vertical pass
+		glMemoryBarrier(GL_ALL_BARRIER_BITS);
+		////////////////////// vertical pass, aoTextureF -> aoTexture, so aoTexture is the final blurred texture
 		bilateralBlurV->Use();
-		programId = bilateralBlurV->programId;
-		// set all uniform and image variables		//int imageUnit = 0; // Increment for other images
-		aoTextureID = aoFbo.aoTextureF;
-		loc = glGetUniformLocation(programId, "kernalSize");
-		glUniform1i(loc, kernalSize);
-		loc = glGetUniformLocation(programId, "normalMap");
-		glUniform1i(loc, GBuffer::GBUFFER_TYPE_NORMAL);
-		loc = glGetUniformLocation(programId, "src");
-		glBindImageTexture(0, aoTextureID, 0, GL_FALSE, 0, GL_READ_ONLY, GL_R32F);
-		glUniform1i(loc, 0);
-		//imageUnit++;
-		loc = glGetUniformLocation(programId, "dst");
-		blurredTexture = aoFbo.aoTexture;
-		glBindImageTexture(1, blurredTexture, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_R32F);
-		glUniform1i(loc, 1);
-		glDispatchCompute(width / 148, height, 1); // Tiles WxH image with groups sized 128x1
+		bilateralBlurV->SetUniformi("kernalSize", kernalSize);
+		bilateralBlurV->SetUniformi("normalMap", GBuffer::GBUFFER_TYPE_NORMAL);
+		bilateralBlurV->SetUniformi("depthMap", GBuffer::GBUFFER_TYPE_SPEC);
+		glBindImageTexture(0, aoFbo.aoTextureF, 0, GL_FALSE, 0, GL_READ_ONLY, GL_R32F);
+		bilateralBlurV->SetUniformi("src", 0);
+		glBindImageTexture(1, aoFbo.aoTexture, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_R32F);
+		bilateralBlurV->SetUniformi("dst", 1);
+		glDispatchCompute(width , height/ 148, 1); // Tiles WxH image with groups sized 128x1
 		//glMemoryBarrier(GL_ALL_BARRIER_BITS);
-
-
+		*/
+		
 		////////////////////////// IBL
-		aoFbo.BindForRead(GL_TEXTURE0 + aoFbo.aoTexture);
+		
 		envMap->Bind(GL_TEXTURE0 + 8);
 		irradMap->Bind(GL_TEXTURE0 + 9);
 		iblShader->Use();
@@ -873,14 +855,15 @@ void Scene::DrawScene()
 		iblShader->SetVP(WorldVP);
 		iblShader->SetWorldMatrix(Identity);
 		iblShader->SetAOMap(aoFbo.aoTexture);
+		aoFbo.BindForRead(GL_TEXTURE0 + aoFbo.aoTexture);
 		iblShader->SetNormalTU(GBuffer::GBUFFER_TYPE_NORMAL);
 		iblShader->SetPosTU(GBuffer::GBUFFER_TYPE_POS);
 		loc = glGetUniformLocation(programId, "colorMap");
 		gl::glUniform1i(loc, GBuffer::GBUFFER_TYPE_DIFFUSE);
 		iblShader->SetEyePos(eye);
 		iblShader->SetScreenDim();
-		gbuffer.BindDepthForRead(GL_TEXTURE0 + gbuffer.depthTexture);
-		iblShader->SetDepthMap(gbuffer.depthTexture);
+		//gbuffer.BindDepthForRead(GL_TEXTURE0 + gbuffer.depthTexture);
+		//iblShader->SetDepthMap(gbuffer.depthTexture);
 		
 		quad->Render();
 		

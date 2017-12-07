@@ -85,7 +85,7 @@ public:
 	ShaderProgram* bilateralBlur;
 	ShaderProgram* bilateralBlurV;
 	GBuffer gbuffer;
-	ShadowFbo shadowFbo;
+//	ShadowFbo shadowFbo;
 	AoFbo aoFbo;
 
 

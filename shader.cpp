@@ -14,6 +14,7 @@
 
 #include <glbinding/gl/gl.h>
 #include <glbinding/Binding.h>
+#include <string>
 using namespace gl;
 
 
@@ -109,13 +110,13 @@ void ShaderProgram::LinkProgram()
 
 void ShaderProgram::SetUniformi(const char* uniform, int val)
 {
-	int loc = glGetUniformLocation(programId, uniform);
+	int loc = glGetUniformLocation(programId, (GLchar*)uniform);
 	glUniform1i(loc, val);
 	CHECKERRORNOX
 }
 void ShaderProgram::SetUniformf(const char* uniform, float val)
 {
-	int loc = glGetUniformLocation(programId, uniform);
+	int loc = glGetUniformLocation(programId, (GLchar*)uniform);
 	glUniform1f(loc, val);
 	CHECKERRORNOX
 }
