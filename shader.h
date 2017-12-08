@@ -27,6 +27,7 @@ public:
     void Unuse();
 	void SetUniformi(const char* uniform, int val);
 	void SetUniformf(const char* uniform, float val);
+	void SetUniform4v(const char* uniform, const MAT4& matrix);
 };
 
 // image based lighting also handles skybox

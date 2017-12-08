@@ -818,7 +818,7 @@ void Scene::DrawScene()
 														//depth in .z component of the vec3
 		quad->Render();
 		aoFbo.UnbindWrite();	// switch back to default framebuffer
-		
+		/*
 		//////////////////////
 		// bi lateral blur pass, aoTexture -> aoTextureF
 		bilateralBlur->Use();
@@ -842,7 +842,7 @@ void Scene::DrawScene()
 		bilateralBlurV->SetUniformi("dst", 1);
 		glDispatchCompute(width , height/ 148, 1); // Tiles WxH image with groups sized 128x1
 		//glMemoryBarrier(GL_ALL_BARRIER_BITS);
-		
+		*/
 		
 		////////////////////////// IBL
 		

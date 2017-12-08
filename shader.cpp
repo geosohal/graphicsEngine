@@ -120,6 +120,12 @@ void ShaderProgram::SetUniformf(const char* uniform, float val)
 	glUniform1f(loc, val);
 	CHECKERRORNOX
 }
+
+void ShaderProgram::SetUniform4v(const char* uniform, const MAT4& matrix)
+{
+	int loc = glGetUniformLocation(programId, (GLchar*)uniform);
+	glUniformMatrix4fv(loc, 1, GL_TRUE, (const GLfloat*)matrix.M);
+}
 void IBLProgram::Initialize()
 {
 	AddShader("IBL.vs", GL_VERTEX_SHADER);

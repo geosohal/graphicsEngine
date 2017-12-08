@@ -102,6 +102,7 @@ public:
 	BasicMesh* smQuad;
 	BasicMesh* skelly;
 	BasicMesh* spider;
+	BasicMesh* gridMesh;	//water mesh
 	Texture* envMap;
 	Texture* irradMap;
 	AnimatedModel* skeleton;
@@ -130,6 +131,8 @@ private:
 	void RenderModels();
 	void InitializePascalsTri(int numRows);
 	void UpdateWalker(float elapsedTime);
+	//file loadinng helpers:
+
 	int kernalSize;
 	float lastctime;
 	vector<vector<unsigned int>> pascalsTriangle;
