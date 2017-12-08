@@ -69,7 +69,7 @@ void main()
 		uint y = uint(gl_FragCoord.y);
 	float depth;//
 	// = ( clamp(texture(depthMap, TexCoord).z ,0,90000) / (MAX_DEPTH - MIN_DEPTH))*9900000.f;
-	depth = 1.f;//texture(depthMap, TexCoord).z ;
+	depth = texture(depthMap, TexCoord).z ;
 	vec3 N = texture(normalMap, TexCoord).xyz;
 	vec3 pos = texture(positionMap, TexCoord).xyz;
 	float AOfactor = CalcAOFactor(N, pos, depth);
