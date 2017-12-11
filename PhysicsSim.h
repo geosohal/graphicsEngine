@@ -1,6 +1,8 @@
 ﻿// demonstrates a simnple physics simulation
 
 #include <glm/glm.hpp>
+#include <glm/gtc/quaternion.hpp>
+#include <glm/gtx/quaternion.hpp>
 #include <math.h>
 #include <glbinding/Binding.h>
 #include <glbinding/gl/gl.h>
@@ -14,21 +16,28 @@ using namespace std;
 class PhysicsSim
 {
 public:
+
+	enum BODYTYPE
+	{
+		BODYTYPE_BLOCK,
+		BODYTYPE_SPHERE
+	};
+
 	struct RigidBody {
 		/* Constant quantities */
 		float mass; /* mass M */
-		mat4 Ibody; /* Ibody */
-		mat4 Ibodyinv; /* I−1 body (inverse of Ibody) */
+		mat3 Ibody; /* Ibody */
+		mat3 Ibodyinv; /* I−1 body (inverse of Ibody) */
 					 
 			/* State variables */
 		vec3 x; /* x(t) */
-		quat q; /* R(t) */
+		glm::quat q; /* R(t) */
 		vec3 P; /* P(t) */
 		vec3 L; /* L(t) */
 
 			/* Derived quantities (auxiliary variables) */
-		mat4 Iinv; /* I−1(t) */
-		mat4 R;	/* R(t) */
+		mat3 Iinv; /* I−1(t) */
+		mat3 R;	/* R(t) */
 		vec3 v; /* v(t) */
 		vec3 omega; /* ω(t) */
 
@@ -36,12 +45,21 @@ public:
 		vec3 force; /* F(t) */
 		vec3 torque; /* τ(t) */
 	};
+	struct Link
+	{
+		float length;
+		RigidBody *rbl;
+		RigidBody *rbr;
+	};
+
+	const float gravity = 9.81f;
 
 	PhysicsSim();
 	~PhysicsSim();
 
-	// initialize state variables of RBs and convert bodies to array so we can run simulation
-	void InitializeSim();
+	// initialize state variables of RBs and lnks
+	void InitializeSim(float mass, enum BODYTYPE bt, float xdim, float ydim,
+		float zdim, vec3 pos, float linkLen);
 	void StateToArray(RigidBody *rb, float *y);
 	void ArrayToState(RigidBody *rb, float *y);
 	void ArrayToBodies(float x[]);
@@ -58,9 +76,14 @@ public:
 
 	void UpdateSim(float elapsedSec, float timeSinceUpdate);
 
+
+private:
 	// ODE ordrinary differential equation solver
 	void eulerstep(float *x0, float *xFinal, int arrSize, float t0, float t1);
+	mat3 GetBlockInertiaTensor(float xScale, float yScale, float zScale);
 
-	RigidBody Bodies[];
+	RigidBody Bodies[NBODIES];
+	Link Links[NBODIES-1];
+
 
 };

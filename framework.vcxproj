@@ -203,6 +203,7 @@
     <ClCompile Include="aoBuffer.cpp" />
     <ClCompile Include="framework.cpp">
     </ClCompile>
+    <ClCompile Include="PhysicsSim.cpp" />
     <ClCompile Include="Quaternion.cpp" />
     <ClCompile Include="rgbe.cpp" />
     <ClCompile Include="rply.c" />
@@ -270,6 +271,7 @@
     <ClInclude Include="assimp\version.h" />
     <ClInclude Include="baselight.h" />
     <ClInclude Include="gbuffer.h" />
+    <ClInclude Include="PhysicsSim.h" />
     <ClInclude Include="rgbe.h" />
     <ClInclude Include="ShadowFbo.h" />
     <ClInclude Include="mesh.h" />

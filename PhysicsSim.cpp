@@ -13,18 +13,47 @@ PhysicsSim::PhysicsSim()
 }
 PhysicsSim::~PhysicsSim()
 {
-
-
+	/*for (int i = 0; i < NBODIES; i++)
+	{
+		if (Bodies[i] != 0)
+			delete Bodies[i];
+			*/
 }
 
 
-
-// initialize state variables of RBs and convert bodies to array so we can run simulation
-void PhysicsSim::InitializeSim()
+// initialize variables of RBs and links
+void PhysicsSim::InitializeSim(float mass, enum BODYTYPE bt, float xdim, float ydim,
+	float zdim, vec3 pos, float linkLen)
 {
+	// initialize bodies from left to right (ascending x)
+	for (int i = 0; i < NBODIES; i++)
+	{
+		Bodies[i].mass = mass;
+		if (bt == BODYTYPE::BODYTYPE_BLOCK)
+			Bodies[i].Ibody = GetBlockInertiaTensor(xdim, ydim, zdim);
+		else
+			throw("no other body types supported yet");
+		Bodies[i].Ibodyinv = inverse(Bodies[i].Ibody);
+		Bodies[i].x = pos + vec3(2.f*i,0,0);
+		Bodies[i].q = quat();
+		Bodies[i].P = vec3();
+		Bodies[i].L = vec3();
+		Bodies[i].R = mat3();
+		Bodies[i].Iinv = Bodies[i].R * Bodies[i].Ibodyinv * glm::transpose(Bodies[i].R);
+		Bodies[i].v = vec3();
+		Bodies[i].omega = vec3(); // maybe should be an axis normalized
+		Bodies[i].force = vec3();
+		Bodies[i].torque = vec3();
+	}
 
+	// initialize links
+	for (int i = 0; i < NBODIES - 1; i++)
+	{
+		Links[i].length = linkLen;
+		Links[i].rbl = &Bodies[i];
+		Links[i].rbr = &Bodies[i + 1];
+	}
 
-	// todo initialize rb variables
 }
 void PhysicsSim::StateToArray(RigidBody *rb, float *y)
 {
@@ -37,10 +66,10 @@ void PhysicsSim::StateToArray(RigidBody *rb, float *y)
 	* terms of elements ‘r’ for the real part,
 	* and ‘i’, ‘j’, and ‘k’ for the vector part.
 	*/
-	*y++ = rb->q.s;
-	*y++ = rb->q.v.x;
-	*y++ = rb->q.v.y;
-	*y++ = rb->q.v.z;
+	*y++ = rb->q.w;
+	*y++ = rb->q.x;
+	*y++ = rb->q.y;
+	*y++ = rb->q.z;
 
 	*y++ = rb->P[0];
 	*y++ = rb->P[1];
@@ -60,17 +89,18 @@ void PhysicsSim::ArrayToState(RigidBody *rb, float *y)
 	rb->L[0] = *y++;
 	rb->L[1] = *y++;
 	rb->L[2] = *y++;
-	rb->R = rb->q.Normalize().ToMat4g();
-}
+	rb->R = glm::toMat3(((quat)normalize(rb->q)));
+
 	/* Compute auxiliary variables... */
 	/* v(t) = P(t)
 	M */
-	rb->v = rb->P / rb->mass;
+	rb->v = (rb->P / rb->mass);
 	/* I−1(t) = R(t)I−1
 	bodyR(t)T*/
-	rb->Iinv = R * Ibodyinv * Transpose(R);
+	rb->Iinv = rb->R * rb->Ibodyinv * glm::transpose(rb->R);
 	/* ω(t) = I−1(t)L(t) */
 	rb->omega = rb->Iinv * rb->L;
+}
 
 
 void PhysicsSim::ArrayToBodies(float x[])
@@ -113,11 +143,19 @@ void PhysicsSim::DdtStateToArray(RigidBody *rb, float *xdot)
 	*xdot++ = rb->v[1];
 	*xdot++ = rb->v[2];
 	/* Compute R˙(t) = ω(t)∗R(t) */
-	Quaternion qdot = .5 * (rb->omega * rb->q);
-	*xdot++ = qdot.r;
-	*xdot++ = qdot.i;
-	*xdot++ = qdot.j;
-	*xdot++ = qdot.k;
+
+	//todo need to remove matrix conversion here, and use what the paper said or i think the matrix
+	// could cause problems as a quaternion can be 2 different matrices right? or at least can have
+	// an accumulation of error which causes skewing.
+	mat3 rdot = Star(rb->omega) * rb->R;
+	quat qdot = normalize(glm::toQuat(rdot));
+//	quat qdot = Star(rb->omega) * rb->q;
+//	quat qdot = (rb->omega * rb->q)* rb->q;
+
+	*xdot++ = qdot.w;
+	*xdot++ = qdot.x;
+	*xdot++ = qdot.y;
+	*xdot++ = qdot.z;
 
 	*xdot++ = rb->force[0]; /* d
 							dt P(t) = F(t) */
@@ -135,8 +173,19 @@ glm::mat3 PhysicsSim::Star(vec3 a)
 	glm::mat3 m;
 	m[0][0] = 0; m[0][1] = -a[2]; m[0][2] = a[1];
 	m[1][0] = a[2]; m[1][1] = 0 ; m[1][2] = -a[0];
-	m[2][0] = -a[1]; m[2][1] = a[0]; m[2][2] = 0
+	m[2][0] = -a[1]; m[2][1] = a[0]; m[2][2] = 0;
+	return m;
 }
+
+// return inertia tensor matrix of a block with x y and z dimensions
+mat3 GetBlockInertiaTensor(float x, float y, float z)
+{
+	mat3 m;
+	m[0][0] = y*y+z*z; m[0][1] = 0; m[0][2] =0;
+	m[1][0] = 0; m[1][1] = x*x+z*z; m[1][2] =0;
+	m[2][0] = 0; m[2][1] = 0; m[2][2] = x*x+y*y;
+}
+
 
 void PhysicsSim::UpdateSim(float elapsedSec, float timeSinceUpdate)
 {
