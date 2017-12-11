@@ -11,6 +11,7 @@ public:
 	Quaternion(float s, float x, float y, float z);
 	Quaternion(MAT4 m);
 	MAT4 ToMat4() const;
+	mat4 ToMat4g() const;
 
 	Quaternion operator+(Quaternion const& q1) const;
 	Quaternion operator*(Quaternion const& q1) const;

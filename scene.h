@@ -122,7 +122,7 @@ public:
 	
 
 
-
+	//
 
 private:
 	float CalcPointLightBSphere(const PointLight& Light);

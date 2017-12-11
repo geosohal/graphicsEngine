@@ -109,6 +109,24 @@ MAT4 Quaternion::ToMat4() const
 	return ans;
 }
 
+mat4 Quaternion::ToMat4g() const
+{
+	mat4 ans;
+	ans[0][0] = 1.f - 2.f * (v.y*v.y + v.z*v.z);
+	ans[1][0] = (v.x*v.y - s*v.z) * 2.f;
+	ans[2][0] = (v.x*v.z + s*v.y) * 2.f;
+
+	ans[0][1] = 2.f* (v.x*v.y + s*v.z);
+	ans[1][1] = 1.f - 2.f * (v.x*v.x + v.z*v.z);
+	ans[2][1] = 2.f * (v.y*v.z - s*v.x);
+
+	ans[0][2] = 2.f * (v.x*v.z - s*v.y);
+	ans[1][2] = 2.f * (v.y*v.z + s*v.x);
+	ans[2][2] = 1.f - 2.f * (v.x*v.x + v.y*v.y);
+
+	return ans;
+}
+
 // rotates the vector with this quaternion
 vec3 Quaternion::Rotate(vec3 const& v_) const
 {
