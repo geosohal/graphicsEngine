@@ -40,7 +40,7 @@ MAT4 aiToMAT4(const aiMatrix4x4& aiMatrix);
 MAT4 Rotate(const int i, const float theta);
 MAT4 Scale(const float x, const float y, const float z);
 MAT4 Translate(const float x, const float y, const float z);
-
+MAT4 Translate(vec3 t);
 MAT4 Perspective(const float rx, const float ry,
                  const float front, const float back);
 MAT4 Perspective2(const float front, const float back, 

@@ -117,9 +117,9 @@ void Scene::InitializeScene()
 	mode = 9;
 	key = 0;
 	nav = true;
-	spin = 210.63;
-	tilt = 6.259;
-	eye = vec3(1.56f, 2.8f, 3.7f);
+	spin = 187.63;
+	tilt = .9259;
+	eye = vec3(9.56f, 30.8f, 3.7f);
 	speed = .005f;
 	last_time = glutGet((GLenum)GLUT_ELAPSED_TIME);
 	tr = vec3(0.0, 0.0, 25.0);
@@ -452,7 +452,7 @@ void Scene::InitializeScene()
 
 
 
-	
+	physics.InitializeSim(8.f, PhysicsSim::BODYTYPE_BLOCK, 2.f, .5f, .5f, vec3(-5.0f, 0, 0));
 
 	// Schedule first timed animation call
 	glutTimerFunc(30, animate, 1);
@@ -745,7 +745,22 @@ void Scene::DrawScene()
 	t = Translate(0, 0, 2.f)*Rotate(0,90.f)* s;
 	loc = glGetUniformLocation(lightingProgram->programId, "gWorld");
 	glUniformMatrix4fv(loc, 1, GL_TRUE, t.Pntr());
-	testMesh->Render();
+	//testMesh->Render();
+
+	physics.UpdateSim(now, timeSinceUpdate/1000.f);
+	for (int i = 0; i < NBODIES; i++)
+	{
+		t = Translate(physics.Bodies[i].x) * Scale(2.f, .5f, .5f);// *physics.Bodies[i].q;
+		lightingProgram->SetUniform4v("gWorld", t);
+		if (i == 1)
+		{
+			lightingProgram->SetUniformi("test", 5);
+			box->Render();
+			lightingProgram->SetUniformi("test", 0);
+		}
+		else
+			box->Render();
+	}
 
 
 	//aoFbo.BindForRead(GL_TEXTURE0 + aoFbo.aoTextureF);
@@ -757,7 +772,7 @@ void Scene::DrawScene()
 		glDepthMask(GL_FALSE);
 		glDisable(GL_DEPTH_TEST);
 	#endif
-	#ifndef BUFFERDEBUG
+	#ifndef BUFFERDEBU
 		// begin light passes by setting blending so we can add the output of 
 		// FS (source color) to framebuffer (destination color)
 		//since each light source is handled by its own FS invocation

@@ -51,6 +51,10 @@ MAT4 Translate(const float x, const float y, const float z)
     return T;
 }
 
+MAT4 Translate(vec3 t)
+{
+	return Translate(t.x, t.y, t.z);
+}
 
 
 // Returns a perspective projection matrix

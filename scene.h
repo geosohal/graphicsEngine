@@ -21,6 +21,7 @@
 #include "ShadowFbo.h"
 #include "walkpath.h"
 #include "aoBuffer.h"
+#include "PhysicsSim.h"
 #define SOLUTION
 enum ObjectIds {
     nullId	= 0,
@@ -119,6 +120,7 @@ public:
 	SpotLight spotLight;
 	int randomness = 1;
 	std::vector<float> shCoeffs;	// spherical harmonic coefficients
+	PhysicsSim physics;
 	
 
 

@@ -13,6 +13,7 @@ using namespace glm;
 using namespace std;
 #define STATE_SIZE 13
 #define NBODIES 5
+#define BLOCKSPACING 5.5f
 class PhysicsSim
 {
 public:
@@ -22,6 +23,10 @@ public:
 		BODYTYPE_BLOCK,
 		BODYTYPE_SPHERE
 	};
+
+// todo notes rb v in ComputeForceAndTorque(float t, RigidBody *rb, int i)
+	// may be wrong because its not using the end point velocity, just the
+	// rb velocity. we need to use omega.
 
 	struct RigidBody {
 		/* Constant quantities */
@@ -44,28 +49,39 @@ public:
 			/* Computed quantities */
 		vec3 force; /* F(t) */
 		vec3 torque; /* τ(t) */
+		float xhExtent; // sticks are connected along x-extends. 
+						// this is the half extent
+		vec3 lEndPt;	// left end point where spring attaches
+		vec3 rEndPt;	// right "
+		vec3 lEndPtVel;	// left end point velocity
+		vec3 rEndPtVel;	// right "
 	};
 	struct Link
 	{
-		float length;
+		float length;	// spring rest length
 		RigidBody *rbl;
 		RigidBody *rbr;
+		vec3 forceL;	// force on leftside (-x) of spring
+		vec3 forceR;	// force on rightside (+x) of spring
 	};
 
-	const float gravity = 9.81f;
+	const float g = 9.81f;
+	const float springStiffness =0.89f;
+	const float damperCoeff =0.015f;
 
 	PhysicsSim();
 	~PhysicsSim();
 
-	// initialize state variables of RBs and lnks
+	// initialize state variables of RBs and lnks, blocks are initialized from left to right
+	// left is -x, right is +x, this assume horizontal layout but oh well
 	void InitializeSim(float mass, enum BODYTYPE bt, float xdim, float ydim,
-		float zdim, vec3 pos, float linkLen);
+		float zdim, vec3 pos);
 	void StateToArray(RigidBody *rb, float *y);
 	void ArrayToState(RigidBody *rb, float *y);
 	void ArrayToBodies(float x[]);
 	void BodiesToArray(float x[]);
 	//ComputeForceAndTorquetakes into account all forces and torques: gravity, wind, interaction with other bodies etc
-	void ComputeForceAndTorque(float t, RigidBody *rb);
+	void ComputeForceAndTorque(float t, RigidBody *rb, int i);
 	// dxdt is called by numerical solver ode (euler or RK) and is responsible for allocating enough space for the
 	//arrays x, and xdot(STATE_SIZE · NBODIES worth for each).
 	void Dxdt(float t, float x[], float xdot[]);
@@ -76,14 +92,20 @@ public:
 
 	void UpdateSim(float elapsedSec, float timeSinceUpdate);
 
-
+	vec3 anchorLeft;
+	vec3 anchorRight;
+	RigidBody Bodies[NBODIES];
+	float x0[STATE_SIZE * NBODIES];
+	float xFinal[STATE_SIZE * NBODIES];
 private:
 	// ODE ordrinary differential equation solver
 	void eulerstep(float *x0, float *xFinal, int arrSize, float t0, float t1);
 	mat3 GetBlockInertiaTensor(float xScale, float yScale, float zScale);
+	vec3 GetEndPt(bool isRight, RigidBody* rb);
 
-	RigidBody Bodies[NBODIES];
+	
 	Link Links[NBODIES-1];
+
 
 
 };

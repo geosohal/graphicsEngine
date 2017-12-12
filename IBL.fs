@@ -24,8 +24,8 @@ uniform sampler2D aoMap;	// this is the specular map, it stores the AO factor in
 uniform vec3 eyePos;
 uniform vec2 screenDim;
 uniform vec4 objColor = vec4(1,1,1,1);
-uniform float metallicness = .95f;
-uniform float roughness = 0.01f;
+uniform float metallicness = .85f;
+uniform float roughness = 0.04f;
 uniform int randomness = 10;
 
            // Tone Mapping Settings

@@ -13,7 +13,7 @@ layout (location = 2) out vec3 DiffuseOut;
 layout (location = 3) out vec3 WorldPosOut;   
 
 uniform sampler2D depthMap;   
-  
+  uniform int test = 0;
   
    
 										
@@ -23,8 +23,11 @@ void main()
 {											
 	WorldPosOut     = WorldPos0; //100.0;					
 	DiffuseOut      = texture(gColorMap, TexCoord0).xyz;
+
 	NormalOut       = normalize(Normal0);		
-	
+	if (test == 5)
+		NormalOut       = vec3(1,0,0);	
+
     float Depth = texture(depthMap, TexCoord0).x;                               
     Depth = clamp( (Depth-MIN_DEPTH) / (MAX_DEPTH - MIN_DEPTH), 0,1)*5.f;          
 	
