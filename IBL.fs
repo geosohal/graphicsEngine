@@ -226,8 +226,8 @@ void main()
 		// perspective division to transform vector to NDC space.                            
     vec3 pixPos = texture(positionMap, TexCoord).xyz;       
 	//pixPos = texture(aoMap, TexCoord).xyz;
-	if (pixPos.x < 20f && pixPos.x > -20.f && pixPos.y < 20f && pixPos.y > -20.f &&
-		pixPos.z < 20f && pixPos.z > -20.f)
+	if (pixPos.x < 90f && pixPos.x > -90.f && pixPos.y < 80f && pixPos.y > -80.f &&
+		pixPos.z < 90f && pixPos.z > -90.f)
 	{
 		vec4 kd = vec4(1.f,1.f,1.f,1.f);
 

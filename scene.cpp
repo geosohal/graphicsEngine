@@ -117,16 +117,16 @@ void Scene::InitializeScene()
 	mode = 9;
 	key = 0;
 	nav = true;
-	spin = 187.63;
-	tilt = .9259;
-	eye = vec3(9.56f, 30.8f, 3.7f);
+	spin = 179.63;
+	tilt = 4.9259;
+	eye = vec3(-0.26f, 66.8f, 3.7f);
 	speed = .005f;
 	last_time = glutGet((GLenum)GLUT_ELAPSED_TIME);
 	tr = vec3(0.0, 0.0, 25.0);
 
 	ry = 0.4;
 	front = 0.3;
-	back = 100.f;
+	back = 400.f;
 #endif
 
 	//	objectRoot = new Object(NULL, nullId);
@@ -329,12 +329,12 @@ void Scene::InitializeScene()
 
 	CHECKERRORNOX
 
-
-#ifdef PROJECT1
 		lineShader = new ShaderProgram();
 	lineShader->AddShader("line.vs", GL_VERTEX_SHADER);
 	lineShader->AddShader("line.fs", GL_FRAGMENT_SHADER);
 	lineShader->LinkProgram();
+
+#ifdef PROJECT1
 
 	triangleShader = new ShaderProgram();
 	triangleShader->AddShader("triangles.vs", GL_VERTEX_SHADER);
@@ -452,10 +452,15 @@ void Scene::InitializeScene()
 
 
 
-	physics.InitializeSim(8.f, PhysicsSim::BODYTYPE_BLOCK, 2.f, .5f, .5f, vec3(-5.0f, 0, 0));
+	physics.InitializeSim(2.5f, PhysicsSim::BODYTYPE_BLOCK, 2.f, .5f, .5f, vec3(-13.5f, 0, 0.f));
 
 	// Schedule first timed animation call
 	glutTimerFunc(30, animate, 1);
+}
+
+void Scene::MoveAnchor(bool isLeft, int mouseX, int mouseY)
+{
+	
 }
 bool slowMo = false;
 bool firstKeyDown = false;
@@ -484,55 +489,41 @@ void Scene::DrawScene()
 
 
 	float camDist = (fastCam) ? dist * 4.f : dist / 4.f;
-
+	
 	if (key == 'w')
 	{
-		eye += camDist*vec3(sin(spin*rad), cos(spin*rad), 0.0);
-		printf("eye x:%f", eye[0]); printf("eye y:%f", eye[1]); printf("eye z:%f", eye[2]);
+		physics.anchorLeft.z += dist*2.8f;
 	}
 	if (key == 's')
-	{
-		eye -= camDist*vec3(sin(spin*rad), cos(spin*rad), 0.0);
-		printf("eye x:%f", eye[0]); printf("eye y:%f", eye[1]); printf("eye z:%f", eye[2]);
-	}
+		physics.anchorLeft.z -= dist*2.8f;
 	if (key == 'd')
-	{
-		eye += camDist*vec3(cos(spin*rad), -sin(spin*rad), 0.0);
-		printf("eye x:%f", eye[0]); printf("eye y:%f", eye[1]); printf("eye z:%f", eye[2]);
-	}
+		physics.anchorLeft.x -= dist*2.8f;
 	if (key == 'a')
-	{
-		eye -= camDist*vec3(cos(spin*rad), -sin(spin*rad), 0.0);
-		printf("eye x:%f", eye[0]); printf("eye y:%f", eye[1]); printf("eye z:%f", eye[2]);
-	}
+		physics.anchorLeft.x += dist*2.8f;
+	if (key == 'p')
+		fastCam = !fastCam;
 	if (key == 'g')
-	{
-		spotLight.pos.z -= camDist;
-		randomness -= 1;
-		printf("R: %i  ", randomness);
-	}
+		physics.anchorRight.z -= dist*2.8f;
 
 	if (key == 't')
-	{
-		spotLight.pos.z += camDist;
-		randomness += 1;
-		printf("R: %i  ", randomness);
-	}
-	if (key == 'p' && firstKeyDown)
-		fastCam = !fastCam;
-	if (key == 'y')
-		eye[2] -= camDist;
+		physics.anchorRight.z += dist*2.8f;
+
+	if (key == 'f')
+		physics.anchorRight.x += dist*2.8f;
+
 	if (key == 'h')
-		eye[2] += camDist;
+		physics.anchorRight.x -= dist*2.8f;
+	if (key == 'y')
+		physics.anchorRight.y += dist*2.8f;;
+	if (key == 'r')
+		physics.anchorRight.y -= dist*2.8f;;
 #ifdef PROJECT1
 	if (key == 'z' && firstKeyDown)
 		slowMo = !slowMo;
 	if (key == 'm' && firstKeyDown)
 		drawSkin = !drawSkin;
-	if (key == 'r' && firstKeyDown)
-		skeleton->MoveHighLight(true);
-	if (key == 'f' && firstKeyDown)
-		skeleton->MoveHighLight(false);
+
+
 	if (key == 'c' && firstKeyDown)
 		skeleton->SwitchAnimation();
 #endif
@@ -555,9 +546,9 @@ void Scene::DrawScene()
 		1.0 };
 
 	// Set the viewport, and clear the screen
-	//glViewport(0, 0, width, height);
+	glViewport(0, 0, width, height);
 	glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
-	//glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
 	// Compute Viewing and Perspective transformations.
 	MAT4 WorldProj, WorldView, WorldInverse;
@@ -717,7 +708,7 @@ void Scene::DrawScene()
 	loc = glGetUniformLocation(programId, "gWVP"); // todog actually gVP
 	glUniformMatrix4fv(loc, 1, GL_TRUE, VPmatrix.Pntr());
 
-	s = Scale(28.05f, 28.05f, 28.05f);
+	s = Scale(108.05f, 108.05f, 108.05f);
 	// draw big sphere
 	t = Translate(0, 0, -1.5f)* Rotate(2, -180.f) * s;// ;
 	loc = glGetUniformLocation(lightingProgram->programId, "gWorld");
@@ -728,7 +719,7 @@ void Scene::DrawScene()
 
 
 
-
+	/*
 	float spacing = 1.5f;	// draw spheres
 	for (int i = 0; i < 1; i++)
 	{
@@ -740,17 +731,22 @@ void Scene::DrawScene()
 			sphere->Render();
 		}
 	}
-
+*/
 	// draw dragon
 	t = Translate(0, 0, 2.f)*Rotate(0,90.f)* s;
 	loc = glGetUniformLocation(lightingProgram->programId, "gWorld");
 	glUniformMatrix4fv(loc, 1, GL_TRUE, t.Pntr());
 	//testMesh->Render();
-
+	vector<vec3> linepoints;
+	linepoints.push_back(physics.anchorLeft);
+	lightingProgram->SetUniform4v("gWorld", Translate(linepoints[0].x, linepoints[0].y, linepoints[0].z));
+	spider->Render();
 	physics.UpdateSim(now, timeSinceUpdate/1000.f);
 	for (int i = 0; i < NBODIES; i++)
 	{
-		t = Translate(physics.Bodies[i].x) * Scale(2.f, .5f, .5f);// *physics.Bodies[i].q;
+		linepoints.push_back(physics.Bodies[i].lEndPt);
+		linepoints.push_back(physics.Bodies[i].rEndPt);
+		t = Translate(physics.Bodies[i].x) * glTOMAT4( glm::toMat4(physics.ReflectedQuaternion(i)) ) * Scale(2.f, .5f, .5f);// *physics.Bodies[i].q;
 		lightingProgram->SetUniform4v("gWorld", t);
 		if (i == 1)
 		{
@@ -761,7 +757,21 @@ void Scene::DrawScene()
 		else
 			box->Render();
 	}
+	linepoints.push_back(physics.anchorRight);
+	lightingProgram->SetUniform4v("gWorld", Translate(physics.anchorRight.x, physics.anchorRight.y, physics.anchorRight.z));
+	spider->Render();
 
+	lineShader->Use();
+	lineShader->SetUniform4v("PV", VPmatrix);
+	for (int i = 0; i < linepoints.size(); i += 2)
+	{
+		gl::glBegin(gl::GL_LINES);
+		gl::glVertex3f(linepoints[i].x, linepoints[i].y, linepoints[i].z);
+		gl::glVertex3f(linepoints[i+1].x, linepoints[i+1].y, linepoints[i+1].z);
+		gl::glEnd();
+
+	}
+	lineShader->Unuse();
 
 	//aoFbo.BindForRead(GL_TEXTURE0 + aoFbo.aoTextureF);
 
@@ -881,7 +891,7 @@ void Scene::DrawScene()
 		//iblShader->SetDepthMap(gbuffer.depthTexture);
 		
 		quad->Render();
-		
+	
 		// directinal light pass
 		dirLightShader->Use();
 		CHECKERRORNOX

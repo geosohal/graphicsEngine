@@ -65,9 +65,9 @@ public:
 		vec3 forceR;	// force on rightside (+x) of spring
 	};
 
-	const float g = 9.81f;
-	const float springStiffness =0.89f;
-	const float damperCoeff =0.015f;
+	const float g = 9.1f;
+	const float springStiffness =9.09f;
+	const float damperCoeff =9.55f;
 
 	PhysicsSim();
 	~PhysicsSim();
@@ -91,17 +91,27 @@ public:
 	glm::mat3 Star(vec3 a);
 
 	void UpdateSim(float elapsedSec, float timeSinceUpdate);
+	quat ReflectedQuaternion(int i);
 
 	vec3 anchorLeft;
 	vec3 anchorRight;
 	RigidBody Bodies[NBODIES];
 	float x0[STATE_SIZE * NBODIES];
 	float xFinal[STATE_SIZE * NBODIES];
+	// runge kutta copies of state variables:
+	float x1[STATE_SIZE * NBODIES];
+	float x2[STATE_SIZE * NBODIES];
+	float x3[STATE_SIZE * NBODIES];
+	float x4[STATE_SIZE * NBODIES];
+	float xtemp[STATE_SIZE * NBODIES];
 private:
 	// ODE ordrinary differential equation solver
 	void eulerstep(float *x0, float *xFinal, int arrSize, float t0, float t1);
+	void rungekuttastep(float *x0, float *xFinal, int arrSize, float t0, float t1);
 	mat3 GetBlockInertiaTensor(float xScale, float yScale, float zScale);
 	vec3 GetEndPt(bool isRight, RigidBody* rb);
+	void StateMultT(float *state, float t);
+	void StateAdd(float *state1, float *state2, float state2Coeff, float *results);
 
 	
 	Link Links[NBODIES-1];

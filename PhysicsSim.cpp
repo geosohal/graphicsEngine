@@ -136,9 +136,9 @@ void PhysicsSim::BodiesToArray(float x[])
 vec3 PhysicsSim::GetEndPt(bool isRight, RigidBody* rb)
 {
 	if (isRight)
-		return rb->x + rb->q * (rb->x+vec3(rb->xhExtent, 0, 0));
+		return rb->x + rb->q * (vec3(rb->xhExtent, 0, 0));
 	else
-		return rb->x + rb->q * (rb->x+vec3(-rb->xhExtent, 0, 0));
+		return rb->x + rb->q * (vec3(-rb->xhExtent, 0, 0));
 }
 
 //ComputeForceAndTorquetakes into account all forces and torques: gravity, wind, interaction with other bodies etc
@@ -200,23 +200,22 @@ void PhysicsSim::Dxdt(float t, float x[], float xdot[])
 
 }
 
+quat PhysicsSim::ReflectedQuaternion(int i)
+{
+	return quat(-Bodies[i].q.w, Bodies[i].q.x, Bodies[i].q.y, Bodies[i].q.z);
+}
+
 // The function which does the real work of computing d/dt X(t) and storing it in the array xdot
 void PhysicsSim::DdtStateToArray(RigidBody *rb, float *xdot)
 {
-	/* copy d
-	dt x(t) = v(t) into xdot */
+	/* copy ddt x(t) = v(t) into xdot */
 	*xdot++ = rb->v[0];
 	*xdot++ = rb->v[1];
 	*xdot++ = rb->v[2];
 	/* Compute R˙(t) = ω(t)∗R(t) */
-
-	//todo need to remove matrix conversion here, and use what the paper said or i think the matrix
-	// could cause problems as a quaternion can be 2 different matrices right? or at least can have
-	// an accumulation of error which causes skewing.
-	mat3 rdot = Star(rb->omega) * rb->R;
-	quat rdotq = normalize(glm::toQuat(rdot));	// quaternion version of rdot
-//	quat qdot = Star(rb->omega) * rb->q;
-//	quat qdot = (rb->omega * rb->q)* rb->q;
+	quat rdotq;//quaternion version of rdot
+	quat omegaquat = quat(0, rb->omega);
+	rdotq = .5f* omegaquat * rb->q;
 
 	*xdot++ = rdotq.w;
 	*xdot++ = rdotq.x;
@@ -264,7 +263,7 @@ void PhysicsSim::UpdateSim(float elapsedSec, float timeSinceUpdate)
 			x0[i] = xFinal[i];
 		}
 
-		eulerstep(x0, xFinal, STATE_SIZE * NBODIES,
+		rungekuttastep(x0, xFinal, STATE_SIZE * NBODIES,
 			elapsedSec, elapsedSec + timeSinceUpdate);
 
 		/* copy ddtX(t + 1/24 ) into state variables */
@@ -282,12 +281,12 @@ void PhysicsSim::eulerstep(float *x, float *xdot, int arrSize, float t0, float t
 	float t = t1 - t0;
 	for (int i = 0; i < NBODIES; i++)
 	{
-		/* position  */
-		*xdot++ = (*x++) +(*xdot)*t; 
+		
+		*xdot++ = (*x++) +(*xdot)*t; /* position  */
 		*xdot++ = (*x++) + (*xdot)*t;
 		*xdot++ = (*x++) + (*xdot)*t;
 
-		quat qf;// todo apply same to rotation
+		quat qf;
 		qf.w = *xdot;
 		qf.x = *(xdot+1);
 		qf.y = *(xdot + 2);
@@ -297,7 +296,7 @@ void PhysicsSim::eulerstep(float *x, float *xdot, int arrSize, float t0, float t
 		q0.x = *x++;
 		q0.y = *x++;
 		q0.z = *x++;
-		qf = normalize(q0 * qf);
+		qf = normalize(t*qf+q0);
 
 		*xdot++ = qf.w;	// quaternion
 		*xdot++ = qf.x;
@@ -312,5 +311,94 @@ void PhysicsSim::eulerstep(float *x, float *xdot, int arrSize, float t0, float t
 		*xdot++ = (*x++) + (*xdot)*t;
 		*xdot++ = (*x++) + (*xdot)*t;
 
+	}
+}
+
+// start with x0 at time t0 and find xfinal using derivative function 4 times
+// 4th order runge kutte
+void PhysicsSim::rungekuttastep(float *x0, float *xFinal, int arrSize, float t0, float t1)
+{
+	float t = t1 - t0;
+
+	Dxdt(t, x0, x1);
+	StateMultT(x1, t);
+	StateAdd(x0, x1, .5f, xtemp);
+	Dxdt(t * .5f, xtemp, x2);
+	StateMultT(x2, t);
+	StateAdd(x0, x2,  .5f, xtemp);
+	Dxdt(t * .5f, xtemp, x3);
+	StateMultT(x3, t);
+	StateAdd(x0, x3, 1.f, xtemp);
+	Dxdt(t, xtemp, x4);
+	StateMultT(x4, t);
+
+	StateMultT(x1, 1 / 6.f); StateMultT(x2, 1 / 3.f); StateMultT(x3, 1 / 3.f); StateMultT(x4, 1 / 6.f);
+
+	// add all weighted state estimates to xfinal
+	for (int i = 0; i < STATE_SIZE; i++)
+	{
+		if (i != 3)
+			xFinal[i] = x1[i] + x2[i] + x3[i] + x4[i];
+		else
+		{
+			quat qtemp;
+			qtemp.w = x1[i] + x2[i] + x3[i] + x4[i];
+			qtemp.x = x1[4] + x2[4] + x3[4] + x4[4];
+			qtemp.y = x1[5] + x2[5] + x3[5] + x4[5];
+			qtemp.z = x1[6] + x2[6] + x3[6] + x4[6];
+			qtemp = normalize(qtemp);
+			xFinal[3] = qtemp.w;
+			xFinal[4] = qtemp.x;
+			xFinal[5] = qtemp.y;
+			xFinal[6] = qtemp.z;
+			i = 6;	// increment so that we jump over quaternion indices
+		}
+	}
+}
+
+// multiply all ddt state variables by a value t
+void PhysicsSim::StateMultT(float *state, float t)
+{
+	for (int i = 0; i < STATE_SIZE; i++)
+	{
+		if (i != 3)	// not quaternion starting index
+			state[i] = state[i] *t;
+		else
+		{
+			quat qtemp;
+			qtemp.w = state[3];
+			qtemp.x = state[4];
+			qtemp.y = state[5];
+			qtemp.z = state[6];
+			qtemp = normalize(t*qtemp);
+			state[3] = qtemp.w;
+			state[4] = qtemp.x;
+			state[5] = qtemp.y;
+			state[6] = qtemp.z;
+			i = 6;	// increment so that we jump over quaternion indices
+		}
+	}
+}
+
+void PhysicsSim::StateAdd(float *state1, float *state2, float state2Coeff, float *results)
+{
+	for (int i = 0; i < STATE_SIZE; i++)
+	{
+		if (i != 3)	// not quaternion starting index
+			results[i] = state1[i] + state2[i] * state2Coeff;
+		else
+		{
+			quat qtemp;
+			qtemp.w = state1[3] + state2[3];
+			qtemp.x = state1[4] + state2[4];
+			qtemp.y = state1[5] + state2[5];
+			qtemp.z = state1[6] + state2[6];
+			qtemp = normalize(qtemp);
+			results[3] = qtemp.w;
+			results[4] = qtemp.x;
+			results[5] = qtemp.y;
+			results[6] = qtemp.z;
+			i = 6;	// increment so that we jump over quaternion indices
+		}
 	}
 }

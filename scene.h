@@ -122,7 +122,7 @@ public:
 	std::vector<float> shCoeffs;	// spherical harmonic coefficients
 	PhysicsSim physics;
 	
-
+	void MoveAnchor(bool isLeft, int mouseX, int mouseY);
 
 	//
 

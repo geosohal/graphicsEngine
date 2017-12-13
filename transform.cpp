@@ -122,6 +122,26 @@ MAT4 GetView(vec3 pos, vec3 dir, vec3 up)
 
 }
 
+MAT4 glTOMAT4(const glm::mat4 gM)
+{
+	MAT4 mm;
+	mm[0][0] = gM[0][0]; mm[0][1] = gM[0][1]; mm[0][2] = gM[0][2]; mm[0][3] = gM[0][3];
+	mm[1][0] = gM[1][0]; mm[1][1] = gM[1][1]; mm[1][2] = gM[1][2]; mm[1][3] = gM[1][3];
+	mm[2][0] = gM[2][0]; mm[2][1] = gM[2][1]; mm[2][2] = gM[2][2]; mm[2][3] = gM[2][3];
+	mm[3][0] = gM[3][0]; mm[3][1] = gM[3][1]; mm[3][2] = gM[3][2]; mm[3][3] = gM[3][3];
+	return mm;
+}
+
+MAT4 glTOMAT4(const glm::mat3 gM)
+{
+	MAT4 mm;
+	mm[0][0] = gM[0][0]; mm[0][1] = gM[0][1]; mm[0][2] = gM[0][2]; mm[0][3] = 0;
+	mm[1][0] = gM[1][0]; mm[1][1] = gM[1][1]; mm[1][2] = gM[1][2]; mm[1][3] = 0;
+	mm[2][0] = gM[2][0]; mm[2][1] = gM[2][1]; mm[2][2] = gM[2][2]; mm[2][3] =0;
+	mm[3][0] = 0; mm[3][1] = 0; mm[3][2] = 0; mm[3][3] = 1;
+	return mm;
+}
+
 MAT4 aiToMAT4(const aiMatrix4x4& aiMatrix)
 {
 	MAT4 m;

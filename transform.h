@@ -37,6 +37,8 @@ public:
     float* Pntr();
 };
 MAT4 aiToMAT4(const aiMatrix4x4& aiMatrix);
+MAT4 glTOMAT4(const glm::mat4 glmat);
+MAT4 glTOMAT4(const glm::mat3 glmat);
 MAT4 Rotate(const int i, const float theta);
 MAT4 Scale(const float x, const float y, const float z);
 MAT4 Translate(const float x, const float y, const float z);

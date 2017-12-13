@@ -1,6 +1,6 @@
 #version 330
 out vec4 color;
-uniform float red = .5;
+uniform float red = 1.f;
 
 void main()
 {
