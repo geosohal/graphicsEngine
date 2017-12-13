@@ -263,7 +263,7 @@ void PhysicsSim::UpdateSim(float elapsedSec, float timeSinceUpdate)
 			x0[i] = xFinal[i];
 		}
 
-		rungekuttastep(x0, xFinal, STATE_SIZE * NBODIES,
+		eulerstep(x0, xFinal, STATE_SIZE * NBODIES,
 			elapsedSec, elapsedSec + timeSinceUpdate);
 
 		/* copy ddtX(t + 1/24 ) into state variables */
@@ -279,6 +279,9 @@ void PhysicsSim::eulerstep(float *x, float *xdot, int arrSize, float t0, float t
 {
 	Dxdt(t1 - t0, x0, xFinal);
 	float t = t1 - t0;
+
+	StateAdd(x, xdot, t, xdot);
+	return;
 	for (int i = 0; i < NBODIES; i++)
 	{
 		
@@ -313,7 +316,33 @@ void PhysicsSim::eulerstep(float *x, float *xdot, int arrSize, float t0, float t
 
 	}
 }
-
+void PhysicsSim::StateAdd(float *state1, float *state2, float state2Coeff, float *results)
+{
+	for (int i = 0; i < STATE_SIZE; i++)
+	{
+		if (i != 3)	// not quaternion starting index
+			results[i] = state1[i] + state2[i] * state2Coeff;
+		else
+		{
+			quat q1;
+			q1.w = state1[3] ;
+			q1.x = state1[4] ;
+			q1.y = state1[5] ;
+			q1.z = state1[6] ;
+			quat qf;
+			qf.w = state2[3] * state2Coeff;
+			qf.x = state2[4] * state2Coeff;
+			qf.y = state2[5] * state2Coeff;
+			qf.z = state2[6] * state2Coeff;
+			qf = normalize(q1 + qf*state2Coeff);
+			results[3] = qf.w;
+			results[4] = qf.x;
+			results[5] = qf.y;
+			results[6] = qf.z;
+			i = 6;	// increment so that we jump over quaternion indices
+		}
+	}
+}
 // start with x0 at time t0 and find xfinal using derivative function 4 times
 // 4th order runge kutte
 void PhysicsSim::rungekuttastep(float *x0, float *xFinal, int arrSize, float t0, float t1)
@@ -370,7 +399,7 @@ void PhysicsSim::StateMultT(float *state, float t)
 			qtemp.x = state[4];
 			qtemp.y = state[5];
 			qtemp.z = state[6];
-			qtemp = normalize(t*qtemp);
+			qtemp = (t*qtemp);	// normalize?
 			state[3] = qtemp.w;
 			state[4] = qtemp.x;
 			state[5] = qtemp.y;
@@ -380,25 +409,3 @@ void PhysicsSim::StateMultT(float *state, float t)
 	}
 }
 
-void PhysicsSim::StateAdd(float *state1, float *state2, float state2Coeff, float *results)
-{
-	for (int i = 0; i < STATE_SIZE; i++)
-	{
-		if (i != 3)	// not quaternion starting index
-			results[i] = state1[i] + state2[i] * state2Coeff;
-		else
-		{
-			quat qtemp;
-			qtemp.w = state1[3] + state2[3];
-			qtemp.x = state1[4] + state2[4];
-			qtemp.y = state1[5] + state2[5];
-			qtemp.z = state1[6] + state2[6];
-			qtemp = normalize(qtemp);
-			results[3] = qtemp.w;
-			results[4] = qtemp.x;
-			results[5] = qtemp.y;
-			results[6] = qtemp.z;
-			i = 6;	// increment so that we jump over quaternion indices
-		}
-	}
-}
