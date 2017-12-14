@@ -99,10 +99,10 @@ public:
 	float x0[STATE_SIZE * NBODIES];
 	float xFinal[STATE_SIZE * NBODIES];
 	// runge kutta copies of state variables:
-	float x1[STATE_SIZE * NBODIES];
-	float x2[STATE_SIZE * NBODIES];
-	float x3[STATE_SIZE * NBODIES];
-	float x4[STATE_SIZE * NBODIES];
+	float k1[STATE_SIZE * NBODIES];
+	float k2[STATE_SIZE * NBODIES];
+	float k3[STATE_SIZE * NBODIES];
+	float k4[STATE_SIZE * NBODIES];
 	float xtemp[STATE_SIZE * NBODIES];
 private:
 	// ODE ordrinary differential equation solver
@@ -112,7 +112,8 @@ private:
 	vec3 GetEndPt(bool isRight, RigidBody* rb);
 	void StateMultT(float *state, float t);
 	void StateAdd(float *state1, float *state2, float state2Coeff, float *results);
-
+	void StateAdd(float *x1, float *x2, float *x3, float *x4, float *xFinal);
+	void ClearStates();	// clears all state arrays from last update
 	
 	Link Links[NBODIES-1];
 

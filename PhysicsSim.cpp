@@ -167,8 +167,8 @@ void PhysicsSim::ComputeForceAndTorque(float t, RigidBody *rb, int i)
 
 }
 
-// dxdt is called by numerical solver ode (euler or RK) and is responsible for allocating enough space for the
-//arrays x, and xdot(STATE_SIZE · NBODIES worth for each).
+// dxdt is called by numerical solver ode (euler or RK) and is responsible for taking second argument
+// as an initial state and calculating the xdot into the third argument
 void PhysicsSim::Dxdt(float t, float x[], float xdot[])
 {
 	/* put data in x[] into Bodies[] */
@@ -263,7 +263,7 @@ void PhysicsSim::UpdateSim(float elapsedSec, float timeSinceUpdate)
 			x0[i] = xFinal[i];
 		}
 
-		eulerstep(x0, xFinal, STATE_SIZE * NBODIES,
+		rungekuttastep(x0, xFinal, STATE_SIZE * NBODIES,
 			elapsedSec, elapsedSec + timeSinceUpdate);
 
 		/* copy ddtX(t + 1/24 ) into state variables */
@@ -277,135 +277,152 @@ void PhysicsSim::UpdateSim(float elapsedSec, float timeSinceUpdate)
 // ODE ordrinary differential equation solver
 void PhysicsSim::eulerstep(float *x, float *xdot, int arrSize, float t0, float t1)
 {
-	Dxdt(t1 - t0, x0, xFinal);
+	Dxdt(t1 - t0, x0, xdot);
 	float t = t1 - t0;
 
-	StateAdd(x, xdot, t, xdot);
-	return;
+	StateAdd(x, xdot, 1, xdot);
+}
+void PhysicsSim::StateAdd(float *x, float* xdot, float t, float *results)
+{
 	for (int i = 0; i < NBODIES; i++)
 	{
-		
-		*xdot++ = (*x++) +(*xdot)*t; /* position  */
-		*xdot++ = (*x++) + (*xdot)*t;
-		*xdot++ = (*x++) + (*xdot)*t;
+
+		*results++ = (*x++) + (*xdot++)*t; /* position  */
+		*results++ = (*x++) + (*xdot++)*t;
+		*results++ = (*x++) + (*xdot++)*t;
 
 		quat qf;
-		qf.w = *xdot;
-		qf.x = *(xdot+1);
-		qf.y = *(xdot + 2);
-		qf.z = *(xdot + 3);
+		qf.w = *xdot++;
+		qf.x = *(xdot++ );
+		qf.y = *(xdot++ );
+		qf.z = *(xdot++ );
 		quat q0;
 		q0.w = *x++;
 		q0.x = *x++;
 		q0.y = *x++;
 		q0.z = *x++;
-		qf = normalize(t*qf+q0);
+		qf = normalize(t*qf + q0);
 
-		*xdot++ = qf.w;	// quaternion
-		*xdot++ = qf.x;
-		*xdot++ = qf.y;
-		*xdot++ = qf.z;
-// P, P(t)
-		*xdot++ = (*x++) + (*xdot)*t;
-		*xdot++ = (*x++) + (*xdot)*t;
-		*xdot++ = (*x++) + (*xdot)*t;
-// L
-		*xdot++ = (*x++) + (*xdot)*t;
-		*xdot++ = (*x++) + (*xdot)*t;
-		*xdot++ = (*x++) + (*xdot)*t;
+		*results++ = qf.w;	// quaternion
+		*results++ = qf.x;
+		*results++ = qf.y;
+		*results++ = qf.z;
+		// P, P(t)
+		*results++ = (*x++) + (*xdot++)*t;
+		*results++ = (*x++) + (*xdot++)*t;
+		*results++ = (*x++) + (*xdot++)*t;
+		// L
+		*results++ = (*x++) + (*xdot++)*t;
+		*results++ = (*x++) + (*xdot++)*t;
+		*results++ = (*x++) + (*xdot++)*t;
 
 	}
 }
-void PhysicsSim::StateAdd(float *state1, float *state2, float state2Coeff, float *results)
+
+void PhysicsSim::ClearStates()
 {
-	for (int i = 0; i < STATE_SIZE; i++)
+	for (int i = 0; i < NBODIES; i++)
 	{
-		if (i != 3)	// not quaternion starting index
-			results[i] = state1[i] + state2[i] * state2Coeff;
-		else
+		for (int j = 0; j < STATE_SIZE; j++)
 		{
-			quat q1;
-			q1.w = state1[3] ;
-			q1.x = state1[4] ;
-			q1.y = state1[5] ;
-			q1.z = state1[6] ;
-			quat qf;
-			qf.w = state2[3] * state2Coeff;
-			qf.x = state2[4] * state2Coeff;
-			qf.y = state2[5] * state2Coeff;
-			qf.z = state2[6] * state2Coeff;
-			qf = normalize(q1 + qf*state2Coeff);
-			results[3] = qf.w;
-			results[4] = qf.x;
-			results[5] = qf.y;
-			results[6] = qf.z;
-			i = 6;	// increment so that we jump over quaternion indices
+			int k = i*STATE_SIZE + j;
+			k1[k] = 0;
+			k2[k] = 0;
+			k3[k] = 0;
+			k4[k] = 0;
+			xtemp[k] = 0;
 		}
 	}
 }
 // start with x0 at time t0 and find xfinal using derivative function 4 times
 // 4th order runge kutte
-void PhysicsSim::rungekuttastep(float *x0, float *xFinal, int arrSize, float t0, float t1)
+void PhysicsSim::rungekuttastep(float *x0, float *xdot, int arrSize, float t0, float t1)
 {
 	float t = t1 - t0;
+	ClearStates();
+	Dxdt(t, x0, k1);
+	StateAdd(x0, k1, t*.5f, xtemp);
+	Dxdt(t * .5f, xtemp, k2);
+	StateAdd(x0, k2, t*.5f, xtemp);
+	Dxdt(t * .5f, xtemp, k3);
+	StateAdd(x0, k3, t, xtemp);
+	Dxdt(t, xtemp, k4);
 
-	Dxdt(t, x0, x1);
-	StateMultT(x1, t);
-	StateAdd(x0, x1, .5f, xtemp);
-	Dxdt(t * .5f, xtemp, x2);
-	StateMultT(x2, t);
-	StateAdd(x0, x2,  .5f, xtemp);
-	Dxdt(t * .5f, xtemp, x3);
-	StateMultT(x3, t);
-	StateAdd(x0, x3, 1.f, xtemp);
-	Dxdt(t, xtemp, x4);
-	StateMultT(x4, t);
+	StateAdd(x0, k1, t/6.f, k1);
+	StateAdd(k1, k2, t / 3.f, k2);
+	StateAdd(k2, k3, t / 3.f, k3);
+	StateAdd(k3, k4, t / 6.f, xdot);
+}
+/*//	StateMultT(k4, t);
 
-	StateMultT(x1, 1 / 6.f); StateMultT(x2, 1 / 3.f); StateMultT(x3, 1 / 3.f); StateMultT(x4, 1 / 6.f);
+	StateMultT(k1, 1 / 6.f); StateMultT(k2, 1 / 3.f); StateMultT(k3, 1 / 3.f); StateMultT(k4, 1 / 6.f);
+	StateAdd(k1, k2, k3, k4, xFinal);
 
+	StateAdd(x0, xFinal, t, xFinal);*/
+
+void PhysicsSim::StateAdd(float *x1, float *x2, float *x3, float *x4, float *xFinal)
+{
 	// add all weighted state estimates to xfinal
-	for (int i = 0; i < STATE_SIZE; i++)
+	for (int b = 0; b < NBODIES; b++)
 	{
-		if (i != 3)
-			xFinal[i] = x1[i] + x2[i] + x3[i] + x4[i];
-		else
-		{
+
+			*xFinal++ = (*x1++) + (*x2++) + (*x3++) + (*x4++);	//pos
+			*xFinal++ = (*x1++) + (*x2++) + (*x3++) + (*x4++);
+			*xFinal++ = (*x1++) + (*x2++) + (*x3++) + (*x4++);
+
 			quat qtemp;
-			qtemp.w = x1[i] + x2[i] + x3[i] + x4[i];
-			qtemp.x = x1[4] + x2[4] + x3[4] + x4[4];
-			qtemp.y = x1[5] + x2[5] + x3[5] + x4[5];
-			qtemp.z = x1[6] + x2[6] + x3[6] + x4[6];
+			qtemp.w = (*x1++) + (*x2++) + (*x3++) + (*x4++);
+			qtemp.x = (*x1++) + (*x2++) + (*x3++) + (*x4++);
+			qtemp.y = (*x1++) + (*x2++) + (*x3++) + (*x4++);
+			qtemp.z = (*x1++) + (*x2++) + (*x3++) + (*x4++);
 			qtemp = normalize(qtemp);
-			xFinal[3] = qtemp.w;
-			xFinal[4] = qtemp.x;
-			xFinal[5] = qtemp.y;
-			xFinal[6] = qtemp.z;
-			i = 6;	// increment so that we jump over quaternion indices
-		}
+			*xFinal++ = qtemp.w;	// quaternion
+			*xFinal++ = qtemp.x;
+			*xFinal++ = qtemp.y;
+			*xFinal++ = qtemp.z;
+
+			*xFinal++ = (*x1++) + (*x2++) + (*x3++) + (*x4++); // P
+			*xFinal++ = (*x1++) + (*x2++) + (*x3++) + (*x4++);
+			*xFinal++ = (*x1++) + (*x2++) + (*x3++) + (*x4++);
+
+			*xFinal++ = (*x1++) + (*x2++) + (*x3++) + (*x4++); // L
+			*xFinal++ = (*x1++) + (*x2++) + (*x3++) + (*x4++);
+			*xFinal++ = (*x1++) + (*x2++) + (*x3++) + (*x4++);
+
 	}
 }
 
 // multiply all ddt state variables by a value t
 void PhysicsSim::StateMultT(float *state, float t)
 {
-	for (int i = 0; i < STATE_SIZE; i++)
+	for (int i = 0; i < NBODIES; i++)
 	{
-		if (i != 3)	// not quaternion starting index
-			state[i] = state[i] *t;
-		else
-		{
-			quat qtemp;
-			qtemp.w = state[3];
-			qtemp.x = state[4];
-			qtemp.y = state[5];
-			qtemp.z = state[6];
-			qtemp = (t*qtemp);	// normalize?
-			state[3] = qtemp.w;
-			state[4] = qtemp.x;
-			state[5] = qtemp.y;
-			state[6] = qtemp.z;
-			i = 6;	// increment so that we jump over quaternion indices
-		}
+
+		*state = (*state++)*t; /* position  */
+		*state = (*state++)*t;
+		*state = (*state++)*t;
+
+		quat qf;
+		qf.w = *(state);
+		qf.x = *(state+1);
+		qf.y = *(state+2);
+		qf.z = *(state+3);
+
+		qf = normalize(t*qf);
+
+		*state++ = qf.w;	// quaternion
+		*state++ = qf.x;
+		*state++ = qf.y;
+		*state++ = qf.z;
+		// P, P(t)
+		*state =  (*state++)*t;
+		*state =  (*state++)*t;
+		*state =  (*state++)*t;
+		// L
+		*state =  (*state++)*t;
+		*state =  (*state++)*t;
+		*state =  (*state++)*t;
 	}
+
 }
 
