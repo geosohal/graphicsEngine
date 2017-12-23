@@ -66,8 +66,8 @@ public:
 	};
 
 	const float g = 9.1f;
-	const float springStiffness =9.09f;
-	const float damperCoeff =9.55f;
+	const float springStiffness =29.09f;
+	const float damperCoeff =11.55f;
 
 	PhysicsSim();
 	~PhysicsSim();

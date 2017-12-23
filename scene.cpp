@@ -367,7 +367,11 @@ void Scene::InitializeScene()
 		if (!sphere->LoadMesh("content/msphere3.obj")) {
 			printf("Problem loading mesh");
 		}
-
+	testMesh = new BasicMesh();
+	CHECKERRORNOX
+		if (!testMesh->LoadMesh("content/Dragon.obj")) {
+			printf("Problem loading mesh");
+		}
 
 	spider = new BasicMesh();
 	if (!spider->LoadMesh("content/sphere2.obj")) { printf("meshload error");
@@ -379,11 +383,7 @@ void Scene::InitializeScene()
 
 	CHECKERROR;
 #ifndef PROJECT1
-	testMesh = new BasicMesh();
-	CHECKERRORNOX
-		if (!testMesh->LoadMesh("content/dragon.obj")) {
-			printf("Problem loading mesh");
-		}
+
 	box = new BasicMesh();
 	CHECKERRORNOX
 		if (!box->LoadMesh("content/box.obj")) {
@@ -452,7 +452,7 @@ void Scene::InitializeScene()
 
 
 
-	physics.InitializeSim(2.5f, PhysicsSim::BODYTYPE_BLOCK, 2.f, .5f, .5f, vec3(-13.5f, 0, 0.f));
+	physics.InitializeSim(1.0f, PhysicsSim::BODYTYPE_BLOCK, 2.f, .5f, .5f, vec3(-13.5f, 0, 0.f));
 
 	// Schedule first timed animation call
 	glutTimerFunc(30, animate, 1);
@@ -492,31 +492,31 @@ void Scene::DrawScene()
 	
 	if (key == 'w')
 	{
-		physics.anchorLeft.z += dist*2.8f;
+		physics.anchorRight.z += dist*4.8f;
 	}
 	if (key == 's')
-		physics.anchorLeft.z -= dist*2.8f;
+		physics.anchorRight.z -= dist*4.8f;
 	if (key == 'd')
-		physics.anchorLeft.x -= dist*2.8f;
+		physics.anchorRight.x -= dist*4.8f;
 	if (key == 'a')
-		physics.anchorLeft.x += dist*2.8f;
+		physics.anchorRight.x += dist*4.8f;
 	if (key == 'p')
 		fastCam = !fastCam;
 	if (key == 'g')
-		physics.anchorRight.z -= dist*2.8f;
+		physics.anchorLeft.z -= dist*4.8f;
 
 	if (key == 't')
-		physics.anchorRight.z += dist*2.8f;
+		physics.anchorLeft.z += dist*4.8f;
 
 	if (key == 'f')
-		physics.anchorRight.x += dist*2.8f;
+		physics.anchorLeft.x += dist*4.8f;
 
 	if (key == 'h')
-		physics.anchorRight.x -= dist*2.8f;
+		physics.anchorLeft.x -= dist*4.8f;
 	if (key == 'y')
-		physics.anchorRight.y += dist*2.8f;;
+		physics.anchorLeft.y += dist*4.8f;;
 	if (key == 'r')
-		physics.anchorRight.y -= dist*2.8f;;
+		physics.anchorLeft.y -= dist*4.8f;;
 #ifdef PROJECT1
 	if (key == 'z' && firstKeyDown)
 		slowMo = !slowMo;
@@ -739,8 +739,9 @@ void Scene::DrawScene()
 	//testMesh->Render();
 	vector<vec3> linepoints;
 	linepoints.push_back(physics.anchorLeft);
-	lightingProgram->SetUniform4v("gWorld", Translate(linepoints[0].x, linepoints[0].y, linepoints[0].z));
-	spider->Render();
+	lightingProgram->SetUniform4v("gWorld", 
+		Translate(linepoints[0].x, linepoints[0].y, linepoints[0].z)*Rotate(0, 90.f));
+	testMesh->Render();
 	physics.UpdateSim(now, timeSinceUpdate/1000.f);
 	for (int i = 0; i < NBODIES; i++)
 	{
@@ -831,6 +832,20 @@ void Scene::DrawScene()
 				r * sin(degreeIncCounter[degreeArrindex]), -3.8f);
 		}*/
 	#endif
+	/*	pointlightShader->Use();
+		pointlightShader->SetEyeWorldPos(eye[0], eye[1], eye[2]);
+		for (int i = 0; i < NBODIES; i++)
+		{
+			pointLights[i].pos = physics.Bodies[i].lEndPt;
+			MAT4 translate = Translate(pointLights[i].pos[0],
+				pointLights[i].pos[1], pointLights[i].pos[2]);
+			float bSphereScale = CalcPointLightBSphere(pointLights[i]);
+			MAT4 scale = Scale(bSphereScale, bSphereScale, bSphereScale);
+			MAT4 transform = (translate*scale);
+			pointlightShader->SetWVP(VPmatrix * transform);
+			sphere->Render();
+			CHECKERRORNOX
+		}*/
 
 		aoFbo.BindForWrite();	// from now on all color writes will goto aoFBO.aoTexture?
 		glClear(GL_COLOR_BUFFER_BIT);	// if we dont clear texture keeps accumulating the writes
@@ -869,6 +884,8 @@ void Scene::DrawScene()
 		//glMemoryBarrier(GL_ALL_BARRIER_BITS);
 		*/
 		
+
+
 		////////////////////////// IBL
 		
 		envMap->Bind(GL_TEXTURE0 + 8);
@@ -890,6 +907,9 @@ void Scene::DrawScene()
 		//gbuffer.BindDepthForRead(GL_TEXTURE0 + gbuffer.depthTexture);
 		//iblShader->SetDepthMap(gbuffer.depthTexture);
 		
+
+
+
 		quad->Render();
 	
 		// directinal light pass

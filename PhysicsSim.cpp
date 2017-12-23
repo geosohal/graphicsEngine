@@ -27,7 +27,9 @@ PhysicsSim::~PhysicsSim()
 }
 
 
-// initialize variables of RBs and links, assumes: models have CoM at their origin,
+// initialize variables of RBs and links, also copies
+//the bodies to their array form, where the state variables can be used for later calculations
+//assumes: models have CoM at their origin,
 // spacing between rb's will be done on x axis by BLOCKSPACING, the first rb
 // wil lbe placed furthest left
 void PhysicsSim::InitializeSim(float mass, enum BODYTYPE bt, float xdim, float ydim,
@@ -250,28 +252,20 @@ mat3 PhysicsSim::GetBlockInertiaTensor(float x, float y, float z)
 	return m;
 }
 
-
+// update physics simulation state variables
 void PhysicsSim::UpdateSim(float elapsedSec, float timeSinceUpdate)
 {
-
-
-//	for (double t = 0; t < 10.0; t += 1. / 24.)
+	/* copy xFinal back to x0, as x0 is the last state to begin at */
+	for (int i = 0; i < STATE_SIZE * NBODIES; i++)
 	{
-		/* copy xFinal back to x0, as x0 is the last state to begin at */
-		for (int i = 0; i < STATE_SIZE * NBODIES; i++)
-		{
-			x0[i] = xFinal[i];
-		}
-
-		rungekuttastep(x0, xFinal, STATE_SIZE * NBODIES,
-			elapsedSec, elapsedSec + timeSinceUpdate);
-
-		/* copy ddtX(t + 1/24 ) into state variables */
-		ArrayToBodies(xFinal);
+		x0[i] = xFinal[i];
 	}
-	
-	
 
+	rungekuttastep(x0, xFinal, STATE_SIZE * NBODIES,
+		elapsedSec, elapsedSec + timeSinceUpdate);
+
+	/* copy ddtX(t + 1/24 ) into state variables */
+	ArrayToBodies(xFinal);
 }
 
 // ODE ordrinary differential equation solver
@@ -339,7 +333,7 @@ void PhysicsSim::ClearStates()
 void PhysicsSim::rungekuttastep(float *x0, float *xdot, int arrSize, float t0, float t1)
 {
 	float t = t1 - t0;
-	ClearStates();
+	//ClearStates();
 	Dxdt(t, x0, k1);
 	StateAdd(x0, k1, t*.5f, xtemp);
 	Dxdt(t * .5f, xtemp, k2);
@@ -353,12 +347,6 @@ void PhysicsSim::rungekuttastep(float *x0, float *xdot, int arrSize, float t0, f
 	StateAdd(k2, k3, t / 3.f, k3);
 	StateAdd(k3, k4, t / 6.f, xdot);
 }
-/*//	StateMultT(k4, t);
-
-	StateMultT(k1, 1 / 6.f); StateMultT(k2, 1 / 3.f); StateMultT(k3, 1 / 3.f); StateMultT(k4, 1 / 6.f);
-	StateAdd(k1, k2, k3, k4, xFinal);
-
-	StateAdd(x0, xFinal, t, xFinal);*/
 
 void PhysicsSim::StateAdd(float *x1, float *x2, float *x3, float *x4, float *xFinal)
 {

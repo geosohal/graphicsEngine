@@ -25,7 +25,7 @@ uniform vec3 eyePos;
 uniform vec2 screenDim;
 uniform vec4 objColor = vec4(1,1,1,1);
 uniform float metallicness = .85f;
-uniform float roughness = 0.04f;
+uniform float roughness = 0.02f;
 uniform int randomness = 10;
 
            // Tone Mapping Settings

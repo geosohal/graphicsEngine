@@ -110,7 +110,7 @@ public:
 	WalkPath walkPath;
 
 	static const int maxPointLights = 200;
-	int numPointLights =0;
+	int numPointLights =10;
 //	float pointLightSpacing = 30.f;
 	float carouselRadius = 8.f;
 	PointLight pointLights[maxPointLights];
