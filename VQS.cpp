@@ -25,15 +25,7 @@ VQS::VQS(MAT4 const& m)
 	s = 1.f; // assume no scaling in transformations
 }
 
-// convert VQS to a matrix
-MAT4 VQS::ToMat4() const
-{
-	MAT4 ans = q.ToMat4();//.ScalarMultiply(s);
-	ans[0][3] = v.x;
-	ans[1][3] = v.y;
-	ans[2][3] = v.z;
-	return ans;
-}
+
 
 // concatenates VQS's together
 VQS VQS::operator*(VQS const& rhs) 
@@ -85,4 +77,24 @@ VQS VQS::Interpolate(VQS const& q1, VQS const& q2, float t)
 VQS VQS::operator+(VQS const& rhs) const
 {
 	return VQS(v + rhs.v, q + rhs.q, s + rhs.s);
+}
+
+// convert VQS to a matrix
+MAT4 VQS::ToMat4() const
+{
+	MAT4 ans = q.ToMat4();//.ScalarMultiply(s);
+	ans[0][3] = v.x;
+	ans[1][3] = v.y;
+	ans[2][3] = v.z;
+	return ans;
+}
+
+// convert VQS to a colum major matrix
+MAT4 VQS::ToMat4cm() const
+{
+	MAT4 ans = q.ToMat4();//.ScalarMultiply(s);
+	ans[3][0] = v.x;
+	ans[3][1] = v.y;
+	ans[3][2] = v.z;
+	return ans;
 }

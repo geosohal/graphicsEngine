@@ -122,6 +122,10 @@ public:
 	std::vector<float> shCoeffs;	// spherical harmonic coefficients
 	PhysicsSim physics;
 	
+	vec3 ballPos;
+	ShadowFbo shadowFbo;
+	bool isFirstUpdate = true;
+
 	void MoveAnchor(bool isLeft, int mouseX, int mouseY);
 
 	//

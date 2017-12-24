@@ -29,10 +29,11 @@ public:
 	WalkPath();
 	~WalkPath();
 	void InitializeControlPoints(float z, float scale, vec2 translate);
+	void InitializeStraightPath(float z, vec2 start, vec2 end);
 	void Draw(int shaderId);	// draws path lines and control points
 	void DrawControlPts(int shaderId, BasicMesh* mesh, MAT4& vp);	// use different shader for ctrl pt spheres
-	// given an arc length returns the previous and next points, and the 
-	// t value for the curve is returned as an interpolation
+																	// given an arc length returns the previous and next points, and the 
+																	// t value for the curve is returned as an interpolation
 	float GetParametericFromArcLen(float s);
 	vec2 GetPointAndDirFromArcLen(float s, vec2& dir);
 	float GetMaxArcLen();
@@ -42,9 +43,9 @@ public:
 	float zValue;			// the common z value of all control points
 	float GetT();	// returns t, currtime/totaltime in [0,1]
 	void StartOver(); // start path over from beginning
-	// last value used to index into table to retrieve pos. ex: if lastindex = 1,
-	// then the current arc length value is in the range of the positions
-	// from index 0 to index 1
+					  // last value used to index into table to retrieve pos. ex: if lastindex = 1,
+					  // then the current arc length value is in the range of the positions
+					  // from index 0 to index 1
 	int lastTableIndex;
 	float timeToWalk = 27.f;	// time required to finish walk around the path
 	float currTime = 0;	//current time spent walking on path
@@ -52,14 +53,16 @@ public:
 	float walkerSpeed;	// in range from 0 to 1, where 1 is peak speed 
 	MAT4 walkerTransform;
 	float distance;
+	bool isWalking;
+	int timesRecursed = 0;	//for debug, number of times GetParametericFromArcLen recursed
 private:
 	void BuildALTable();
 	void ResetKnotSeq();// resets knots after ctrl point is added
 	int GetDeBoorInterval(float t);	// deboor curve helper function
 	vec2 DeBoor(float t, int p, int i);	// returns deboor curve pos at parameter t
 
-	// for binary search by arc length (elements ordered by arcLength value)
-	bool CompareALEntries(altEntry l, altEntry r); 
+										// for binary search by arc length (elements ordered by arcLength value)
+	bool CompareALEntries(altEntry l, altEntry r);
 
 
 	vector<vector<int>> pascalsTriangle; // used for creating deboor curve

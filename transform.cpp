@@ -86,7 +86,34 @@ MAT4 Perspective2(const float front, const float back, float fov, float w, float
 	return m;
 }
 
+MAT4 SwitchRowOrder(const MAT4& mm)
+{
+	MAT4 m;
+	m[0][0] = mm[0][0]; m[0][1] = mm[1][0]; m[0][2] = mm[2][0]; m[0][3] = mm[3][0];
+	m[1][0] = mm[0][1]; m[1][1] = mm[1][1]; m[1][2] = mm[2][1]; m[1][3] = mm[3][1];
+	m[2][0] = mm[0][2]; m[2][1] = mm[1][2]; m[2][2] = mm[2][2]; m[2][3] = mm[3][2];
+	m[3][0] = mm[0][3]; m[3][1] = mm[1][3]; m[3][2] = mm[2][3]; m[3][3] = mm[3][3];
+	return m;
+}
+glm::mat4 MAT4toGLM(const MAT4& M)
+{
+	glm::mat4 mm;
+	mm[0][0] = M[0][0]; mm[0][1] = M[0][1]; mm[0][2] = M[0][2]; mm[0][3] = M[0][3];
+	mm[1][0] = M[1][0]; mm[1][1] = M[1][1]; mm[1][2] = M[1][2]; mm[1][3] = M[1][3];
+	mm[2][0] = M[2][0]; mm[2][1] = M[2][1]; mm[2][2] = M[2][2]; mm[2][3] = M[2][3];
+	mm[3][0] = M[3][0]; mm[3][1] = M[3][1]; mm[3][2] = M[3][2]; mm[3][3] = M[3][3];
+	return mm;
+}
 
+MAT4 GLMtoMAT4(const glm::mat4& M)
+{
+	MAT4 mm;
+	mm[0][0] = M[0][0]; mm[0][1] = M[0][1]; mm[0][2] = M[0][2]; mm[0][3] = M[0][3];
+	mm[1][0] = M[1][0]; mm[1][1] = M[1][1]; mm[1][2] = M[1][2]; mm[1][3] = M[1][3];
+	mm[2][0] = M[2][0]; mm[2][1] = M[2][1]; mm[2][2] = M[2][2]; mm[2][3] = M[2][3];
+	mm[3][0] = M[3][0]; mm[3][1] = M[3][1]; mm[3][2] = M[3][2]; mm[3][3] = M[3][3];
+	return mm;
+}
 // Multiplies two 4x4 matrices
 MAT4 operator* (const MAT4 A, const MAT4 B)
 {  

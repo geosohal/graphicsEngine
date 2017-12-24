@@ -2,6 +2,7 @@
 #include "AnimatedModel.h"
 #include <glu.h>                // For gluErrorString
 #include "utility.h"
+#include <stack>
 
 using namespace std;
 using namespace gl;
@@ -11,8 +12,8 @@ using namespace glm;
 #define ARRAY_SIZE_IN_ELEMENTS(a) (sizeof(a)/sizeof(a[0]))
 
 #define POSITION_LOCATION    0
-#define NORMAL_LOCATION      1
-#define TEX_COORD_LOCATION   2
+#define TEX_COORD_LOCATION   1
+#define NORMAL_LOCATION      2
 #define BONE_ID_LOCATION     3
 #define BONE_WEIGHT_LOCATION 4
 
@@ -24,6 +25,7 @@ AnimatedModel::AnimatedModel()
 	ZERO_MEM(buffers);
 	drawBones = true;
 	currWalkSpeed = 1;
+	isIKmode = false;
 }
 
 AnimatedModel::~AnimatedModel()
@@ -64,7 +66,8 @@ void AnimatedModel::LoadMesh(const string& filename)
 	importer.SetPropertyInteger(AI_CONFIG_PP_LBW_MAX_WEIGHTS, 4);
 
 	const aiScene* pScene = importer.ReadFile(filename.c_str(),
-		aiProcess_Triangulate | aiProcess_GenNormals);
+		aiProcess_GenUVCoords | aiProcess_TransformUVCoords | aiProcess_FlipUVs | aiProcess_Triangulate | aiProcess_GenSmoothNormals |
+		aiProcess_OptimizeMeshes | aiProcess_LimitBoneWeights); //aiProcess_OptimizeGraph
 
 	if (pScene)
 	{
@@ -77,9 +80,45 @@ void AnimatedModel::LoadMesh(const string& filename)
 		LoadBoneAnimations(pScene);
 
 	}
+	else
+		printf("error reading mesh");
 
 	CHECKERRORNOX
 
+		// apply constraints for IK joints.
+		// chest
+		float chestC = M_PI / 3;
+	skeleton[2].xConstraint.min = -chestC;
+	skeleton[2].xConstraint.max = chestC;
+	skeleton[2].yConstraint.min = -chestC;
+	skeleton[2].yConstraint.max = chestC;
+	skeleton[2].zConstraint.min = -chestC;
+	skeleton[2].zConstraint.max = chestC;
+
+	float uArmC = .2f;
+	// upper arm
+	skeleton[4].xConstraint.min = -.1f;
+	skeleton[4].xConstraint.max = .2f;
+	skeleton[4].yConstraint.min = -uArmC;
+	skeleton[4].yConstraint.max = uArmC;
+	skeleton[4].zConstraint.min = -uArmC;
+	skeleton[4].zConstraint.max = uArmC;
+
+	float lArmC = M_PI;
+	// lower arm
+	skeleton[5].xConstraint.min = -M_PI;
+	skeleton[5].xConstraint.max = M_PI;
+	skeleton[5].yConstraint.min = -M_PI;
+	skeleton[5].yConstraint.max = M_PI;
+	skeleton[5].zConstraint.min = -M_PI;
+	skeleton[5].zConstraint.max = M_PI;
+	// arm end
+	skeleton[17].xConstraint.min = 0;
+	skeleton[17].xConstraint.max = M_PI;
+	skeleton[17].yConstraint.min = 0;	// elbow backward
+	skeleton[17].yConstraint.max = M_PI;
+	skeleton[17].zConstraint.min = -M_PI;
+	skeleton[17].zConstraint.max = M_PI;
 }
 
 // the root bone node is sometimes not at the top of the hierarchy so we go down
@@ -213,7 +252,7 @@ void AnimatedModel::LoadBoneAnimations(const aiScene* scene)
 		string animName = scene->mAnimations[i]->mName.C_Str();
 		animationNames.push_back(animName);
 		currAnimation = animName;//the last animation inserted will end up being the default
-		// iterate channels/bones that animations includes
+								 // iterate channels/bones that animations includes
 		for (int j = 0; j < anim->mNumChannels; j++)
 		{
 			aiNodeAnim* chan = anim->mChannels[j];
@@ -239,7 +278,9 @@ void AnimatedModel::LoadBoneAnimations(const aiScene* scene)
 				aiQuatKey qKey = chan->mRotationKeys[k];
 				aiVectorKey sKey = chan->mScalingKeys[k];
 				key.Time = ((float)k / (numKeys - 1)); // time since start of animation
-				key.ToParentFromBone = VQS(
+				if (key.Time != key.Time)	// was a divide by 0 above
+					key.Time = 0;
+				key.KeyVQS = VQS(
 					vec3(posKey.mValue[0], posKey.mValue[1], posKey.mValue[2]),
 					Quaternion(qKey.mValue.w, qKey.mValue.x, qKey.mValue.y, qKey.mValue.z),
 					sKey.mValue[0]);
@@ -381,6 +422,46 @@ void AnimatedModel::LoadBones(unsigned int meshIndex, vector<SkinnedVertData>& b
 
 }
 
+// for debug
+void AnimatedModel::DrawIKpoiints(int shaderId, BasicMesh* sphere, MAT4& VPmatrix)
+{
+	return;
+	vec4 custColor = vec4(.6, .1, .1, .1);
+	int loc = glGetUniformLocation(shaderId, "custColor");
+	glUniform4fv(loc, 1, &custColor[0]);;
+
+	for (int i = 0; i < IKbetweens.size(); i++)
+	{
+		MAT4 t = Translate(IKbetweens[i].x, IKbetweens[i].y, IKbetweens[i].z)* Scale(.05f, .05f, .05f);
+		loc = glGetUniformLocation(shaderId, "gWVP");
+		glUniformMatrix4fv(loc, 1, GL_TRUE, (VPmatrix*t).Pntr());
+		sphere->Render();
+	}
+	custColor = vec4(0, .7, .1, .1);
+	loc = glGetUniformLocation(shaderId, "custColor");
+	glUniform4fv(loc, 1, &custColor[0]);
+	// also, let's draw the joint positions for better reference
+	for (int i = 0; i < 20; i++)
+	{
+		if (skeleton[i].isIK)	// dont draw IK bones
+			continue;
+		for (int ch = 0; ch < skeleton[i].childrenIndices.size(); ch++)
+		{
+			vec3 endPos = skeleton[i].pos;
+			MAT4 t = Translate(endPos.x, endPos.y, endPos.z)* Scale(.03f, .03f, .03f);
+			loc = glGetUniformLocation(shaderId, "gWVP");
+			glUniformMatrix4fv(loc, 1, GL_TRUE, (VPmatrix*t).Pntr());
+			sphere->Render();
+		}
+	}
+
+	custColor = vec4(.1, .1, .4, .1);
+	loc = glGetUniformLocation(shaderId, "custColor");
+	glUniform4fv(loc, 1, &custColor[0]);
+
+
+}
+
 void AnimatedModel::DrawBones(int gModelLoc, MAT4 modelTrans, int shaderId)
 {
 	glBegin(GL_LINES);
@@ -394,32 +475,33 @@ void AnimatedModel::DrawBones(int gModelLoc, MAT4 modelTrans, int shaderId)
 			int chIndex = skeleton[i].childrenIndices[ch];
 			if (skeleton[chIndex].isIK)
 				continue; // dont draw IK pieces
-			
-			
+
+
 			vec3 startPos = skeleton[chIndex].pos;
 			vec3 endPos = skeleton[i].pos;
 			int loc = glGetUniformLocation(shaderId, "red");
 
 			if (chIndex == currBoneToHighlight)// if bone is selected by highlighter
-				glUniform1fARB(loc, 1);
-			else 
-				glUniform1fARB(loc, .5);
+				glUniform1fARB(loc, 0.f);
+			else
+				glUniform1fARB(loc, 1.f);
 
 			DrawLine(startPos, endPos);
 
-		/* deprecated code for drawing triangles instead of lines
-		vec3 difference = skeleton[chIndex].pos - skeleton[i].pos; // bone from parent to child
+			/* deprecated code for drawing triangles instead of lines
+			vec3 difference = skeleton[chIndex].pos - skeleton[i].pos; // bone from parent to child
 			float len = length(difference);
 			// get the quaternion to rotate the updirection to the vector of the bone
 			Quaternion ztoaQuat = (Quaternion::FromZtoA(vec3(0, 0, 1), difference / len)).Normalize();
 			// final transformation of the bone after its run through heierachy and is being animated
-			
+
 			MAT4 finalBoneTrans =  Translate(skeleton[i].pos[0], skeleton[i].pos[1],
 			skeleton[i].pos[2]) * modelTrans * ztoaQuat.ToMat4() * Scale(1, len, 1);
 			glUniformMatrix4fv(gModelLoc, 1, GL_TRUE, finalBoneTrans.Pntr());
 			glBindVertexArray(mVAO);
 			glDrawElements(GL_TRIANGLES, 13, GL_UNSIGNED_INT, (void*)0);*/
 		}
+
 	}
 
 	glEnd();
@@ -429,15 +511,23 @@ void AnimatedModel::DrawBones(int gModelLoc, MAT4 modelTrans, int shaderId)
 // by working through the hierarchy and using the parents as the origin
 void AnimatedModel::UpdateAnimations(float timeSinceUpdate)
 {
-	float animTime = skeleton[0].animationMap[currAnimation].Duration ;
+	//UpdateIK(timeSinceUpdate);
+	if (!isWalking)
+		return;//temp
+	float animTime = skeleton[0].animationMap[currAnimation].Duration;
 	// elapsed anim time is time elapsed in the animation loop
 	elapsedAnimTime += timeSinceUpdate * currWalkSpeed;
 	if (elapsedAnimTime > animTime)	// if we have finished the loop, we start elapsedtime over again at 0
 		elapsedAnimTime = 0;
 
 	UpdateAnimations(0, VQS(), vec3(0, 0, 0));
+
 }
 
+vec2 AnimatedModel::GetPosition()
+{
+	return vec2(skeleton[0].pos.x, skeleton[0].pos.y);
+}
 // update transformations for each bone, Bone.AnimatedTranform for each bone becomes the final
 // bone transformation that accounts for animation and hierarchy transformations
 void AnimatedModel::UpdateAnimations(int currBone, VQS& currVQS, vec3 lastBonePos)
@@ -449,7 +539,7 @@ void AnimatedModel::UpdateAnimations(int currBone, VQS& currVQS, vec3 lastBonePo
 
 	float animTime = skeleton[0].animationMap[currAnimation].Duration;
 	float percentComplete = elapsedAnimTime / animTime;
-	if (percentComplete > 1.f)
+	if (percentComplete > 1.f || percentComplete != percentComplete)
 	{
 		percentComplete = 0;	// if animation completes, loop back to beginning 
 		elapsedAnimTime = 0;
@@ -458,7 +548,11 @@ void AnimatedModel::UpdateAnimations(int currBone, VQS& currVQS, vec3 lastBonePo
 	// store interpolated animation for this animation frame
 	VQS interpolatedTrans = skeleton[currBone].Transformation;
 	int numKeys = skeleton[currBone].animationMap[currAnimation].Track.KeyFrames.size();
-	if (numKeys > 0)
+	if (numKeys == 1)	// no need to interpolate just use transform of the one key that there is
+	{
+		interpolatedTrans = skeleton[currBone].animationMap[currAnimation].Track.KeyFrames[0].KeyVQS;
+	}
+	else if (numKeys > 0)
 	{
 		int lastKey = numKeys - 1;
 		int prevKeyIndex = (int)floorf(percentComplete * lastKey);
@@ -473,21 +567,238 @@ void AnimatedModel::UpdateAnimations(int currBone, VQS& currVQS, vec3 lastBonePo
 		//
 		if (skeleton[currBone].animationMap[currAnimation].Track.KeyFrames.size() > 0)
 			interpolatedTrans = VQS::Interpolate(
-				skeleton[currBone].animationMap[currAnimation].Track.KeyFrames[prevKeyIndex].ToParentFromBone,
-				skeleton[currBone].animationMap[currAnimation].Track.KeyFrames[nextKeyIndex].ToParentFromBone,
+				skeleton[currBone].animationMap[currAnimation].Track.KeyFrames[prevKeyIndex].KeyVQS,
+				skeleton[currBone].animationMap[currAnimation].Track.KeyFrames[nextKeyIndex].KeyVQS,
 				percentBetween);
 	}
 	//	else if there are no keyframes such as for some IK bones use the node transformation provided
 
+	//todo: clean up area of messy code from debugging row order problems
 	VQS nextVQS = currVQS * interpolatedTrans;	// update origin space for children
-	skeleton[currBone].AnimatedTranform =  globalInvTransform* nextVQS.ToMat4() *skeleton[currBone].ToModelFromBone;
-	MAT4 boneMatrix = globalInvTransform* nextVQS.ToMat4();
+	MAT4 nextTransform = nextVQS.ToMat4cm();
+	MAT4 nextTransform2 = nextVQS.ToMat4();
+	skeleton[currBone].AnimatedTranform = GLMtoMAT4(MAT4toGLM(nextTransform) * MAT4toGLM(SwitchRowOrder(skeleton[currBone].ToModelFromBone)));
+	MAT4 boneMatrix = globalInvTransform* nextTransform2;
 	// bone positions for this point in animation come from the translation component of the bone matrix
 	skeleton[currBone].pos = vec3(boneMatrix[0][3], boneMatrix[1][3], boneMatrix[2][3]);
 	for (int i = 0; i < skeleton[currBone].childrenIndices.size(); i++)
+	{
+		if (skeleton[currBone].childrenIndices[i] == 0)	// some animation files use 0 to indicate no child
+			continue;	// we don't recurse if the child is 0 becaues that would go back to the root bone
 		UpdateAnimations(skeleton[currBone].childrenIndices[i], nextVQS, lastBonePos);
+	}
 
 }
+
+
+
+// initiate IK animation by setting up interpolation points
+// 
+void AnimatedModel::StartIK(vec3 goalPos)
+{
+	goalEndEffector = goalPos;
+	currEndEffector = skeleton[EFindex].pos;
+
+	// if distance from arm (index 5) to goal is too large
+	vec3 currLocation = skeleton[1].pos + vec3(0, 0, zOffSetFromRoot);
+	if (length(goalEndEffector - currLocation) > maxIKdis)
+		isWalking = true;
+	else
+		SetupIKPoints();
+}
+
+// initiate IK animation by setting up interpolation points
+void AnimatedModel::SetupIKPoints()
+{
+	currEndEffector = skeleton[EFindex].pos;
+	IKbetweens.resize(numNodes);
+	// create set of points to move end effector through.
+	// trying linear interpolation, although maybe it should be rounded.
+	vec3 startToEnd = goalEndEffector - currEndEffector;
+	vec3 incrementVec = vec3(startToEnd.x / numNodes, startToEnd.y / numNodes, startToEnd.z / numNodes);
+	IKbetweens[0] = currEndEffector + incrementVec;
+	for (int i = 1; i < numNodes; i++)
+		IKbetweens[i] = IKbetweens[i - 1] + incrementVec;
+
+	isIKmode = true;
+	IKindex = 0;
+	isWalking = false;
+	timeBetweenNode = 0;
+
+}
+
+// inverse kinematics
+// model has finished walking, is close enough to the ball to touch it, so we begin CCD algorithm.
+// once distance between end effector and goal is small enough: exit
+// for each joint, start from end effectors end,
+// compute angle between joint's current angle to its goal angle, and compute cross product
+// rotate joint on cross products axis towards goal angle
+// after IK is done, positions will need to be reset before walker can start up again.
+void AnimatedModel::UpdateIK(float timeSinceUpdate)
+{
+	currEndEffector = skeleton[EFindex].pos;
+	vec3 currLocation = skeleton[1].pos + vec3(0, 0, zOffSetFromRoot);
+	// if char is walking and came within reach of goal end effector
+	// skeleton[5].pos is arm position, one level up from end effector for distance produces best result
+	if (isWalking && length(goalEndEffector - currLocation)  < maxIKdis)
+		SetupIKPoints();	// initiate IK animation
+	else if (isWalking)
+		return;
+	if (isIKmode == false) return;
+
+
+	int currJoint = EFindex;	// start at end effector's joint
+	stack<int> jointIndices;	// put indices on stack so we can accumulate rotation transformations at the end
+	IKbeforeOffset = skeleton[2].pos;
+	// while the current joint is not the root (we dont rotate the root since its not rotated)
+	// we move each joint slightly so it directs itself slightly closer to the next goal point
+	// stop condition for loop is when parent index is 0 which is the root. we do not rotate root.
+	for (int parentIndex = skeleton[currJoint].parentIndex; parentIndex != 0; )
+	{
+		//if End effector reached target (may be final target or in between target)
+		if (currJoint == EFindex && length(skeleton[currJoint].pos - IKbetweens[IKindex]) < .1f)
+		{
+			if (IKindex >= IKbetweens.size() - 1)	// final target reached
+			{
+				isIKmode = false;
+				timeBetweenNode = 0;
+				return;
+			}
+			timeBetweenNode = 0;
+			IKindex++;
+			continue;	// interpolated target reached, so continue moving other joints using incremented IKindex
+		}
+		timeBetweenNode += timeSinceUpdate;
+
+		if (timeBetweenNode > maxTimeToNode)	// EE taking too long to reach next goal, so stop IK
+		{
+			isIKmode = false;
+			return;
+		}
+		jointIndices.push(currJoint);
+
+		// this ended up being a very round about way for applying constraints..
+		// so here we needed to get the joints current direction vector in it's origin space
+		vec3 jointDir = skeleton[currJoint].pos - skeleton[parentIndex].pos;
+		vec3 parentDir = skeleton[parentIndex].pos - skeleton[skeleton[parentIndex].parentIndex].pos;
+		// alpha1 is the anle that the current joint is rotated by
+		float alpha1 = acos(dot(jointDir, parentDir) / (length(jointDir)*length(parentDir)));
+		vec3 axis1 = cross(jointDir, parentDir);
+		axis1 = normalize(axis1);
+		Quaternion q1 = Quaternion::FromAngleAxis(alpha1, axis1);
+		vec3 eulerAngles1 = Quaternion::ToEulerAngle(q1);
+
+		vec3 vck = skeleton[EFindex].pos - skeleton[parentIndex].pos;	// curr joint/end-effector direction
+		vec3 vdk = IKbetweens[IKindex] - skeleton[parentIndex].pos;	// goal joint/end-effector direction vector
+		float alpha = acos(dot(vck, vdk) / (length(vck)*length(vdk)));	// angle to rotate by to reach goal
+
+
+
+
+		vec3 axis = cross(vck, vdk);		// axis to rotate joint on
+		axis = normalize(axis);
+		float rotAmount = IKrotSpeed*timeSinceUpdate;	// rotation amount for this frame
+		if (alpha < -0.01f)	// use negative rotation if alpha is negative, 
+			rotAmount *= -1; //this means we overshot, which actually shouldnt happen
+		if (rotAmount > alpha)
+			rotAmount = alpha;
+		if (rotAmount < -alpha)
+			rotAmount = -alpha;
+		// the rotation is to rotate joint k from vck to vdk
+		Quaternion q = Quaternion::FromAngleAxis(rotAmount, axis);
+		// convert quaternion to euler to apply constraint clamps on angles. order is: x roll, y pitch and z yaw
+		vec3 eulerAngles = Quaternion::ToEulerAngle(q);
+
+		if (eulerAngles1.x > skeleton[currJoint].xConstraint.max || eulerAngles1.x < skeleton[currJoint].xConstraint.min)
+			eulerAngles.x = 0;
+		if (eulerAngles1.y > skeleton[currJoint].yConstraint.max || eulerAngles1.y < skeleton[currJoint].yConstraint.min)
+			eulerAngles.y = 0;
+		if (eulerAngles1.z > skeleton[currJoint].zConstraint.max || eulerAngles1.z < skeleton[currJoint].zConstraint.min)
+			eulerAngles.z = 0;
+		// convert euler angles back to quaternion
+		q = Quaternion::EulerToQuaternion(eulerAngles.x, eulerAngles.y, eulerAngles.z);
+
+		skeleton[currJoint].IKrotation = q.ToMat4();
+		skeleton[currJoint].boneSpacePos = skeleton[currJoint].pos - skeleton[parentIndex].pos; // position where parent is origin
+
+																								// go up hierarchy to parent bone for next iteration
+		currJoint = parentIndex;
+		parentIndex = skeleton[currJoint].parentIndex;
+	}
+
+	// finally, transform joints that are affected by the transformation of the IK related joints
+	// setup bone space position attributes so we have position at origin of each joint
+	StoreOriginalPos(1, 16);	// start from head end
+	StoreOriginalPos(1, 18);	//start from arm Right end 
+
+
+								// apply rotation transformations through the hierarchy starting at the root
+	MAT4 rotations;
+	while (jointIndices.size() > 0)
+	{
+		currJoint = jointIndices.top();
+		jointIndices.pop();
+		rotations = rotations * skeleton[currJoint].IKrotation;
+		// position in world space comes from position in bone space (where each position is based on last bone's
+		// position being the origin ie boneSpacePos). so we apply rotation transformations where we rotate around the
+		// origin of each joint in the hierarchy starting from the root.
+		vec4 jointPos = vec4(skeleton[currJoint].boneSpacePos.x, skeleton[currJoint].boneSpacePos.y, skeleton[currJoint].boneSpacePos.z, 1.0);
+		glm::mat4 glRots = MAT4toGLM(rotations); //todo write own mult
+		jointPos = glRots * jointPos;
+		skeleton[currJoint].pos = skeleton[skeleton[currJoint].parentIndex].pos + vec3(jointPos.x, jointPos.y, jointPos.z);
+	}
+
+	torsoChestRotation = MAT4toGLM(skeleton[1].IKrotation * skeleton[2].IKrotation); // chestrotation for this frame 
+	SetupBoneSpacePos(2, skeleton[2].IKrotation, 4);
+
+
+}
+
+// start at child and work up to root. so this will be called for head end, and again for
+// arm right end. root index would be 1, for torso, this way iteration will stop at chest
+void AnimatedModel::StoreOriginalPos(int rootIndex, int currJoint)
+{
+	for (int parentIndex = skeleton[currJoint].parentIndex; parentIndex != rootIndex; )
+	{
+		skeleton[currJoint].boneSpacePos = skeleton[currJoint].pos - skeleton[skeleton[currJoint].parentIndex].pos;
+		skeleton[currJoint].boneLen = length(skeleton[currJoint].boneSpacePos);
+		currJoint = parentIndex;
+		parentIndex = skeleton[currJoint].parentIndex;
+	}
+	/*		skeleton[rootIndex].boneSpacePos = skeleton[rootIndex].pos - skeleton[skeleton[rootIndex].parentIndex].pos;
+	for (int ch = 0; ch < skeleton[rootIndex].childrenIndices.size(); ch++)
+	{
+	int childIndex = skeleton[rootIndex].childrenIndices[ch];
+	if (childIndex != childToSkip)
+	StoreOriginalPos(childIndex, childToSkip);
+	}
+	*/
+}
+//IK helper function, setup bone space positions and IKRotations from a
+// certain bone on down the hierarchy. refactor childToSkip out to a member variable list
+/*		int parenti = skeleton[rootIndex].parentIndex;
+skeleton[rootIndex].boneSpacePos = skeleton[rootIndex].pos - skeleton[parenti].pos;
+vec4 jointPos = vec4(skeleton[rootIndex].boneSpacePos.x, skeleton[rootIndex].boneSpacePos.y, skeleton[rootIndex].boneSpacePos.z, 1.0);
+glm::mat4 glRots = MAT4toGLM(ikRot); //todo write own mult
+jointPos = glRots * jointPos;
+skeleton[rootIndex].pos = skeleton[skeleton[rootIndex].parentIndex].pos + vec3(jointPos.x, jointPos.y, jointPos.z);*/
+void AnimatedModel::SetupBoneSpacePos(int rootIndex, MAT4 ikRot, int childToSkip)
+{
+	if (skeleton[rootIndex].name != "chest")	// chest is already transformed in previous code. todo remove hardcode
+	{
+		vec4 jointPos = vec4(skeleton[rootIndex].boneSpacePos.x, skeleton[rootIndex].boneSpacePos.y, skeleton[rootIndex].boneSpacePos.z, 1.0);
+		jointPos = torsoChestRotation * jointPos;
+		//jointPos = normalize(jointPos) * skeleton[rootIndex].boneLen;
+		skeleton[rootIndex].pos = skeleton[skeleton[rootIndex].parentIndex].pos + normalize(vec3(jointPos.x, jointPos.y, jointPos.z))* skeleton[rootIndex].boneLen;
+	}
+	for (int ch = 0; ch < skeleton[rootIndex].childrenIndices.size(); ch++)
+	{
+		int childIndex = skeleton[rootIndex].childrenIndices[ch];
+		if (childIndex != childToSkip)
+			SetupBoneSpacePos(childIndex, ikRot, childToSkip);
+	}
+}
+
 // father is the root bone of skeleton. recursive function that populates
 // the children of the root following the hierarchy given by assimp
 // also adds all IK bones which were not added by load bones since IK nodes
@@ -536,7 +847,7 @@ void AnimatedModel::MakeBoneHierarchy(aiNode* pNode, int fatherIndex)
 
 void AnimatedModel::DrawLine(vec3 start, vec3 end)
 {
-	
+
 	glVertex3f(start[0], start[1], start[2]);
 	glVertex3f(end[0], end[1], end[2]);
 
@@ -566,18 +877,23 @@ void AnimatedModel::RenderModel()
 	glBindVertexArray(0);
 }
 
+
+
 void AnimatedModel::GetTransforms(vector<MAT4>& transforms)
 {
+	MAT4 Identity;
 	for (int i = 0; i < skeleton.size(); i++)
 	{
 		if (!skeleton[i].isIK && !skeleton[i].isEnd)
-			transforms.push_back(skeleton[i].AnimatedTranform);
+			transforms.push_back(SwitchRowOrder(skeleton[i].AnimatedTranform));
+		//else
+		//	transforms.push_back(Identity);
 	}
 }
 
 
 void AnimatedModel::SwitchAnimation()
 {
-	currAnimIndex = (currAnimIndex+1) % animationNames.size();
+	currAnimIndex = (currAnimIndex + 1) % animationNames.size();
 	currAnimation = animationNames[currAnimIndex];
 }

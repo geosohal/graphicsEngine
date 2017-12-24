@@ -28,6 +28,12 @@ uniform float metallicness = .85f;
 uniform float roughness = 0.02f;
 uniform int randomness = 10;
 
+
+out vec4 FragColor;
+
+in vec3 Normal0;  
+in vec3 WorldPos0;   
+
            // Tone Mapping Settings
 uniform float A = 0.15;
 uniform float B = 0.50;
@@ -38,7 +44,7 @@ uniform float F = 0.30;
 uniform float W = 11.2;
 uniform float Exposure = 1.0;
 uniform float ExposureBias = 2.0;
-
+  
 vec3 _ToneMap(vec3 x)
 {
   return ((x*(A*x+C*B)+D*E)/(x*(A*x+B)+D*F))-E/F;
@@ -54,10 +60,7 @@ vec4 l2rgb(vec4 c)
 }	   
 	
 
-out vec4 FragColor;
-
-in vec3 Normal0;  
-in vec3 WorldPos0;      
+   
 
 vec2 SphereMap(vec3 N)
 {
@@ -225,9 +228,11 @@ void main()
 	
 		// perspective division to transform vector to NDC space.                            
     vec3 pixPos = texture(positionMap, TexCoord).xyz;       
-	//pixPos = texture(aoMap, TexCoord).xyz;
-	if (pixPos.x < 90f && pixPos.x > -90.f && pixPos.y < 80f && pixPos.y > -80.f &&
-		pixPos.z < 90f && pixPos.z > -90.f)
+	// this range prevents IBL from being applied to skybox.. but if statements can slow down,
+	// so todo: optimize one solution is to try just give the diffuse color in the case 
+	// that pix pos is out of bounds so we do all calculations but in the end dont use them?
+//	if (pixPos.x < 90f && pixPos.x > -90.f && pixPos.y < 80f && pixPos.y > -80.f &&
+//		pixPos.z < 90f && pixPos.z > -90.f)
 	{
 		vec4 kd = vec4(1.f,1.f,1.f,1.f);
 
@@ -250,8 +255,9 @@ void main()
 		float AOfactor = texture(aoMap, TexCoord).x;
 		FragColor = finalColor * AOfactor;
 		//FragColor = vec4(texture(positionMap, TexCoord));
+
 	}
-	else
+	//else
 	{
 		// draw sky dome
 		//vec3 Color = texture(colorMap, TexCoord).xyz;

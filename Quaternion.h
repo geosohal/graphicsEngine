@@ -32,6 +32,8 @@ public:
 	static Quaternion iSlerp(Quaternion const& q1, Quaternion const& q2, float n, float t);
 	static Quaternion FromZtoA(vec3 z, vec3 a);
 	static Quaternion FromAngleAxis(float angle, vec3 axis);
+	static Quaternion EulerToQuaternion(float roll, float pitch, float yaw);
+	static vec3 ToEulerAngle(Quaternion const& q); // vec returns roll, pitch and yaw respectively
 	float s;
 	vec3 v;
 };

@@ -1,6 +1,7 @@
 #include "walkpath.h"
 #include <algorithm>	// binary search
 #include "utility.h"	// lerp
+#include <math.h>
 
 using namespace gl;
 #define ARRAY_SIZE_IN_ELEMENTS(a) (sizeof(a)/sizeof(a[0]))
@@ -10,7 +11,7 @@ WalkPath::WalkPath()
 	alTableSize = 100;
 	degree = 3;
 	lastTableIndex = 1;	// start walking path at beginning of curve
-	// Initialize pascals triangle
+						// Initialize pascals triangle
 	int numberOfRows = 16;
 	pascalsTriangle.resize(numberOfRows);
 	for (int i = 0; i < numberOfRows; i++)
@@ -21,14 +22,14 @@ WalkPath::WalkPath()
 	for (int r = 2; r <= numberOfRows; r++)
 	{
 		// pad row with ones
-		pascalsTriangle[r - 1][ 0] = 1;
-		pascalsTriangle[r - 1][ r - 1] = 1;
+		pascalsTriangle[r - 1][0] = 1;
+		pascalsTriangle[r - 1][r - 1] = 1;
 
 		// fill in colums in between the ones
 		for (int j = 0; j <= r - 3; j++)
 		{
-			pascalsTriangle[r - 1][ j + 1] =
-				pascalsTriangle[r - 2][ j] + pascalsTriangle[r - 2][ j + 1];
+			pascalsTriangle[r - 1][j + 1] =
+				pascalsTriangle[r - 2][j] + pascalsTriangle[r - 2][j + 1];
 		}
 	}
 }
@@ -38,26 +39,42 @@ WalkPath::~WalkPath()
 
 }
 
+void WalkPath::InitializeStraightPath(float z, vec2 start, vec2 end)
+{
+	StartOver();
+	zValue = z;
+	ctrlPts.clear();
+	//currTime = 0;
+	ctrlPts.push_back(start); ResetKnotSeq();
+	ctrlPts.push_back(start); ResetKnotSeq();
+	ctrlPts.push_back(end); ResetKnotSeq();
+	ctrlPts.push_back(end); ResetKnotSeq();
+	ctrlPts.push_back(end); ResetKnotSeq();
+	BuildALTable();
+	;
+}
+
 void WalkPath::InitializeControlPoints(float z, float scale, vec2 t)
 {
+	isWalking = true;
 	zValue = z;
 	// insert predetermined set of control points and scale them down
 	// so they fit on the scene
-	ctrlPts.push_back(vec2(231, 469) * scale+t);  ResetKnotSeq();
-	ctrlPts.push_back(vec2(230, 469) * scale+t); ResetKnotSeq();
-	ctrlPts.push_back(vec2(156, 451) * scale+t); ResetKnotSeq();
-	ctrlPts.push_back(vec2(94,383 ) * scale+t); ResetKnotSeq();
-	ctrlPts.push_back(vec2(106,224 ) * scale+t); ResetKnotSeq();
-	ctrlPts.push_back(vec2(286,159 ) * scale+t); ResetKnotSeq();
-	ctrlPts.push_back(vec2(476,409 ) * scale+t); ResetKnotSeq();
-	ctrlPts.push_back(vec2(689,442 ) * scale+t); ResetKnotSeq();
-	ctrlPts.push_back(vec2(764,283 ) * scale+t); ResetKnotSeq();
-	ctrlPts.push_back(vec2(680,136 ) * scale+t); ResetKnotSeq();
-	ctrlPts.push_back(vec2(528,151 ) * scale+t); ResetKnotSeq();
-	ctrlPts.push_back(vec2(393,411 ) * scale+t); ResetKnotSeq();
-	ctrlPts.push_back(vec2(333,451 ) * scale+t); ResetKnotSeq();
-	ctrlPts.push_back(vec2(237,489 ) * scale+t); ResetKnotSeq();
-	ctrlPts.push_back(vec2(35,375 ) * scale+t); ResetKnotSeq();
+	ctrlPts.push_back(vec2(231, 469) * scale + t);  ResetKnotSeq();
+	ctrlPts.push_back(vec2(230, 469) * scale + t); ResetKnotSeq();
+	ctrlPts.push_back(vec2(156, 451) * scale + t); ResetKnotSeq();
+	ctrlPts.push_back(vec2(94, 383) * scale + t); ResetKnotSeq();
+	ctrlPts.push_back(vec2(106, 224) * scale + t); ResetKnotSeq();
+	ctrlPts.push_back(vec2(286, 159) * scale + t); ResetKnotSeq();
+	ctrlPts.push_back(vec2(476, 409) * scale + t); ResetKnotSeq();
+	ctrlPts.push_back(vec2(689, 442) * scale + t); ResetKnotSeq();
+	ctrlPts.push_back(vec2(764, 283) * scale + t); ResetKnotSeq();
+	ctrlPts.push_back(vec2(680, 136) * scale + t); ResetKnotSeq();
+	ctrlPts.push_back(vec2(528, 151) * scale + t); ResetKnotSeq();
+	ctrlPts.push_back(vec2(393, 411) * scale + t); ResetKnotSeq();
+	ctrlPts.push_back(vec2(333, 451) * scale + t); ResetKnotSeq();
+	ctrlPts.push_back(vec2(237, 489) * scale + t); ResetKnotSeq();
+	ctrlPts.push_back(vec2(35, 375) * scale + t); ResetKnotSeq();
 
 
 	BuildALTable();
@@ -164,7 +181,7 @@ vec2 WalkPath::GetPointAndDirFromArcLen(float s, vec2& dir)
 	int i = GetDeBoorInterval(t);
 	vec2 currPos = DeBoor(t, degree, i);
 	// calculate direction by getting the next point on the curve
-	t = (t+.04 >= ctrlPts.size()) ? ctrlPts.size() : t+.04;
+	t = (t + .04 >= ctrlPts.size()) ? ctrlPts.size() : t + .04;
 	vec2 nextPos = DeBoor(t, degree, i);
 	dir = nextPos - currPos;
 	return currPos;
@@ -176,29 +193,48 @@ float WalkPath::GetParametericFromArcLen(float s)
 	// if the table index got passed the last element
 	if (lastTableIndex >= alTable.size())
 		lastTableIndex = 1;
+	bool wasIndexIncremented = false;
 	// if s value has exceeded the arc length of last known table index, increment index
 	if (s > alTable[lastTableIndex].arcLength)
+	{
 		lastTableIndex++;
+		wasIndexIncremented = true;
+	}
 
 	int nei;	// next table element index
 	int pei;	// previous element index
-	pei = lastTableIndex-1;
+	pei = lastTableIndex - 1;
 	nei = lastTableIndex;
 
-	
+
 	// arc length falls between the interval of previous and next indices into table
 	if (s > alTable[pei].arcLength && s <= alTable[nei].arcLength)
 	{
 		float u = (s - alTable[pei].arcLength) / (alTable[nei].arcLength - alTable[pei].arcLength);
-		return (1-u) * alTable[pei].paramatric + u * alTable[nei].paramatric;
+		float t = (1 - u) * alTable[pei].paramatric + u * alTable[nei].paramatric;
+		if (t != t)
+			printf("t is nan\n");
+		return t;
 	}
-	else if (pei == 0 && s < alTable[nei].arcLength) 
+	else if (pei == 0 && s < alTable[nei].arcLength)
 	{	// if we're on the first index and arc length is less than first index
+		if (alTable[pei].paramatric != alTable[pei].paramatric)
+			printf("t is nan\n");
 		return alTable[pei].paramatric;	// to debug
 	}
 	else
-	{	// a row in the table was skipped over
-		return GetParametericFromArcLen(s);
+	{
+		if (wasIndexIncremented)
+		{
+			float t = GetParametericFromArcLen(s);
+			if (t != t)
+				printf("t is nan\n");
+			return t;// a row in the table was skipped over
+		}
+		lastTableIndex--;
+
+		GetParametericFromArcLen(s);
+
 	}
 }
 
@@ -213,10 +249,12 @@ void WalkPath::StartOver()
 	currArcLengthDist = 1.1f;
 	lastTableIndex = 1;
 	currTime = 0;
+	isWalking = true;
 }
 
 void WalkPath::UpdateWalker(float timeElapsed)
 {
+	if (!isWalking) return;
 	currTime += timeElapsed / 1000.f;	// update amount of time elapsed
 
 
@@ -226,11 +264,12 @@ void WalkPath::UpdateWalker(float timeElapsed)
 	{
 		//printf("starting over\n");
 		StartOver();
+		isWalking = false;
 		t = 0;
 	}
-	float s = EaseInOut(t, .2f, .8f);	// get arclength position for current time in [0,1]
-	// actual arclength distance on curve
-	currArcLengthDist = (GetMaxArcLen()-GetMinArcLen()) * s + GetMinArcLen();	
+	float s = EaseInOut(t, .07f, .8f);	// get arclength position for current time in [0,1]
+										// actual arclength distance on curve
+	currArcLengthDist = (GetMaxArcLen() - GetMinArcLen()) * s + GetMinArcLen();
 	vec2 dir;	// direction walker is facing
 	vec2 newPos = GetPointAndDirFromArcLen(currArcLengthDist, dir);
 	dir = glm::normalize(dir);
@@ -240,7 +279,7 @@ void WalkPath::UpdateWalker(float timeElapsed)
 	if (distance > .05)	// typical update moves walker by .05
 		walkerSpeed = 1;
 	else
-		walkerSpeed = distance / .05;	// current speed ratio of the max speed
+		walkerSpeed = distance / .053;	// current speed ratio of the max speed
 	walkerTransform = Translate(newPos.x, newPos.y, zValue + 3.96f) * r;
 }
 
@@ -251,12 +290,13 @@ bool WalkPath::CompareALEntries(altEntry l, altEntry r)
 
 void WalkPath::BuildALTable()
 {
+	alTable.clear();
 	assert(ctrlPts.size() > degree);
 	vec2 lastPoint;
 	vec2 currPoint = ctrlPts.at(0);
 	int i;	// deboor interval
 	float arcLenSum = 0;
-	alpha = (float)(ctrlPts.size()-degree) / alTableSize;
+	alpha = (float)(ctrlPts.size() - degree) / alTableSize;
 
 	// add first table element
 	//altEntry firstElement;
@@ -266,7 +306,7 @@ void WalkPath::BuildALTable()
 	//alTable.push_back(firstElement);
 
 	// add all other arc length table elements
-	for (float t = degree ; t < ctrlPts.size(); t += alpha)
+	for (float t = degree; t < ctrlPts.size(); t += alpha)
 	{
 		lastPoint = currPoint;
 		i = GetDeBoorInterval(t);

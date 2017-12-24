@@ -186,3 +186,44 @@ Quaternion Quaternion::iSlerp(Quaternion const& q1, Quaternion const& q2,float k
 	}
 
 }
+
+
+Quaternion Quaternion::EulerToQuaternion(float roll, float pitch, float yaw)
+{
+	Quaternion q;
+	// Abbreviations for the various angular functions
+	float cy = cos(yaw * 0.5);
+	float sy = sin(yaw * 0.5);
+	float cr = cos(roll * 0.5);
+	float sr = sin(roll * 0.5);
+	float cp = cos(pitch * 0.5);
+	float sp = sin(pitch * 0.5);
+
+	q.s = cy * cr * cp + sy * sr * sp;
+	q.v.x = cy * sr * cp - sy * cr * sp;
+	q.v.y = cy * cr * sp + sy * sr * cp;
+	q.v.z = sy * cr * cp - cy * sr * sp;
+	return q;
+}
+
+/* vec returns roll, pitch and yaw respectively*/
+vec3 Quaternion::ToEulerAngle(Quaternion const& q)
+{
+	// roll (x-axis rotation)
+	float  sinr = 2.f * (q.s * q.v.x + q.v.y * q.v.z);
+	float  cosr = 1.f - 2.0 * (q.v.x * q.v.x + q.v.y * q.v.y);
+	float roll = atan2(sinr, cosr);
+	float pitch;
+	// pitch (y-axis rotation)
+	float sinp = +2.0 * (q.s * q.v.y - q.v.z * q.v.x);
+	if (fabs(sinp) >= 1)
+		pitch = copysign(M_PI / 2, sinp); // use 90 degrees if out of range
+	else
+		pitch = asin(sinp);
+
+	// yaw (z-axis rotation)
+	double siny = +2.0 * (q.s * q.v.z + q.v.x * q.v.y);
+	double cosy = +1.0 - 2.0 * (q.v.y * q.v.y + q.v.z * q.v.z);
+	float yaw = atan2(siny, cosy);
+	return vec3(roll, pitch, yaw);
+}

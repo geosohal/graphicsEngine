@@ -39,6 +39,9 @@ public:
 MAT4 aiToMAT4(const aiMatrix4x4& aiMatrix);
 MAT4 glTOMAT4(const glm::mat4 glmat);
 MAT4 glTOMAT4(const glm::mat3 glmat);
+glm::mat4 MAT4toGLM(const MAT4& m);
+MAT4 GLMtoMAT4(const glm::mat4& M);
+MAT4 SwitchRowOrder(const MAT4& mm);
 MAT4 Rotate(const int i, const float theta);
 MAT4 Scale(const float x, const float y, const float z);
 MAT4 Translate(const float x, const float y, const float z);
